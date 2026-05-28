@@ -1,4 +1,4 @@
-.PHONY: bootstrap dev-worker test lint typecheck format
+.PHONY: bootstrap dev-worker test lint typecheck format smoke-immich
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -27,3 +27,6 @@ typecheck:
 
 format:
 	uv run ruff format src tests
+
+smoke-immich:
+	$(PYTHON) scripts/smoke_immich.py
