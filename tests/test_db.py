@@ -69,6 +69,41 @@ def test_apply_migrations_fails_loudly_on_bad_sql(tmp_path: Path) -> None:
     with pytest.raises(sqlite3.Error):
         apply_migrations(conn, migrations)
 
+    rows = conn.execute("SELECT COUNT(*) FROM _migrations").fetchall()
+    assert rows[0][0] == 0
+
+
+def test_apply_migrations_rolls_back_partial_multi_statement(tmp_path: Path) -> None:
+    """If statement N of a multi-statement migration fails, statements 1..N-1
+    must not be visible on next run."""
+    migrations = tmp_path / "migrations"
+    # 3 CREATE statements; the 3rd is invalid SQL.
+    _write_migration(
+        migrations,
+        1,
+        "multi",
+        "CREATE TABLE t1 (id INTEGER);"
+        " CREATE TABLE t2 (id INTEGER);"
+        " CREATE TABEL t3 (id INTEGER);",  # typo
+    )
+    db = tmp_path / "app.sqlite"
+    conn = get_connection(db)
+
+    with pytest.raises(sqlite3.Error):
+        apply_migrations(conn, migrations)
+
+    # Neither t1 nor t2 should exist; migration not recorded.
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+    assert "t1" not in tables
+    assert "t2" not in tables
+    rows = conn.execute("SELECT COUNT(*) FROM _migrations").fetchall()
+    assert rows[0][0] == 0
+
 
 def test_apply_migrations_skips_already_applied(tmp_path: Path) -> None:
     migrations = tmp_path / "migrations"

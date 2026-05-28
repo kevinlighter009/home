@@ -30,6 +30,32 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def _split_sql_statements(sql: str) -> list[str]:
+    """Split a migration SQL string into individual statements.
+
+    Naive splitter that handles the SQL we actually use in migrations:
+    - Top-level `;` separates statements.
+    - Lines starting with `--` are stripped (whole-line comments only).
+    - Empty statements (whitespace-only between semicolons) are dropped.
+
+    This deliberately does NOT handle `;` inside string literals or compound
+    statements (e.g., triggers with BEGIN ... END). If we ever need those,
+    we'll need a real SQL parser. Our migrations are CREATE TABLE / CREATE
+    INDEX only — no string literals containing semicolons.
+    """
+    lines: list[str] = []
+    for raw in sql.splitlines():
+        line = raw.rstrip()
+        # Drop full-line comments only; in-line `-- foo` after SQL is unusual
+        # in our migrations and would require a real parser to handle safely.
+        if line.lstrip().startswith("--"):
+            continue
+        lines.append(line)
+    joined = "\n".join(lines)
+    statements = [s.strip() for s in joined.split(";")]
+    return [s for s in statements if s]
+
+
 def _ensure_migrations_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -44,6 +70,8 @@ def _ensure_migrations_table(conn: sqlite3.Connection) -> None:
 
 def apply_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> list[str]:
     """Apply any pending migrations. Returns the descriptions applied this call."""
+    if not migrations_dir.is_dir():
+        raise FileNotFoundError(f"migrations directory not found: {migrations_dir}")
     _ensure_migrations_table(conn)
     applied = {
         row[0] for row in conn.execute("SELECT description FROM _migrations").fetchall()
@@ -55,14 +83,11 @@ def apply_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> list[str
         if desc in applied:
             continue
         sql = path.read_text()
-        # NOTE: sqlite3.executescript() issues an implicit COMMIT before
-        # running and then runs its statements in autocommit, so wrapping it
-        # in an explicit BEGIN/COMMIT raises "cannot commit - no transaction
-        # is active". Run the script as-is; record the migration in its own
-        # short transaction.
-        conn.executescript(sql)
+        statements = _split_sql_statements(sql)
         try:
             conn.execute("BEGIN")
+            for stmt in statements:
+                conn.execute(stmt)
             conn.execute(
                 "INSERT INTO _migrations (id, applied_at, description) "
                 "VALUES (?, datetime('now'), ?)",
