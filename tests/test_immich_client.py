@@ -102,3 +102,60 @@ def test_search_metadata_parses_taken_at_as_utc() -> None:
     assert assets[0].taken_at == datetime(2026, 5, 27, 18, 42, 9, tzinfo=UTC)
     # updatedAt "2026-05-27T18:42:15.000Z"
     assert assets[0].updated_at == datetime(2026, 5, 27, 18, 42, 15, tzinfo=UTC)
+
+
+@respx.mock
+def test_search_metadata_raises_on_missing_required_fields() -> None:
+    """An asset missing the required 'id' or 'updatedAt' should raise."""
+    bad_body = {
+        "assets": {
+            "items": [
+                {
+                    "ownerId": "owner-x",
+                    "originalFileName": "no_id.jpg",
+                    "updatedAt": "2026-05-28T12:00:00Z",
+                    "exifInfo": {},
+                }
+            ]
+        }
+    }
+    respx.post("http://immich.local:2283/api/search/metadata").mock(
+        return_value=httpx.Response(200, json=bad_body)
+    )
+    with pytest.raises(ImmichClientError):
+        _client().search_metadata(updated_after=datetime(2026, 5, 27, tzinfo=UTC))
+
+
+@respx.mock
+def test_search_metadata_raises_on_missing_updated_at() -> None:
+    bad_body = {
+        "assets": {
+            "items": [
+                {
+                    "id": "asset-x",
+                    "ownerId": "owner-x",
+                    "originalFileName": "no_updated.jpg",
+                    "exifInfo": {},
+                }
+            ]
+        }
+    }
+    respx.post("http://immich.local:2283/api/search/metadata").mock(
+        return_value=httpx.Response(200, json=bad_body)
+    )
+    with pytest.raises(ImmichClientError):
+        _client().search_metadata(updated_after=datetime(2026, 5, 27, tzinfo=UTC))
+
+
+def test_client_context_manager_closes() -> None:
+    """Using the client as a context manager calls close on exit."""
+    closed = {"called": False}
+
+    class FakeHttpx:
+        def close(self) -> None:
+            closed["called"] = True
+
+    c = ImmichClient(base_url="http://x", api_key="k", client=FakeHttpx())  # type: ignore[arg-type]
+    with c:
+        pass
+    assert closed["called"] is True

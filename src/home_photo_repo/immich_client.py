@@ -47,6 +47,12 @@ class ImmichClient:
     def close(self) -> None:
         self._client.close()
 
+    def __enter__(self) -> ImmichClient:
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
+
     # --- public API ---------------------------------------------------------
 
     def search_metadata(
@@ -92,20 +98,31 @@ class ImmichClient:
 
     @staticmethod
     def _parse_asset(item: dict[str, Any]) -> ImmichAsset:
-        exif = item.get("exifInfo") or {}
-        updated_at = _parse_dt(item["updatedAt"])
-        if updated_at is None:
-            raise ImmichClientError(f"asset {item.get('id')!r} missing updatedAt")
-        return ImmichAsset(
-            id=item["id"],
-            owner_id=item.get("ownerId", ""),
-            original_file_name=item.get("originalFileName", ""),
-            updated_at=updated_at,
-            taken_at=_parse_dt(exif.get("dateTimeOriginal")),
-            latitude=exif.get("latitude"),
-            longitude=exif.get("longitude"),
-            file_created_at=_parse_dt(item.get("fileCreatedAt")),
-        )
+        asset_id = item.get("id", "<unknown>")
+        try:
+            exif = item.get("exifInfo") or {}
+            updated_at_raw = item.get("updatedAt")
+            updated_at = _parse_dt(updated_at_raw)
+            if updated_at is None:
+                raise ImmichClientError(
+                    f"asset {asset_id!r} missing required field 'updatedAt'"
+                )
+            return ImmichAsset(
+                id=item["id"],
+                owner_id=item.get("ownerId", ""),
+                original_file_name=item.get("originalFileName", ""),
+                updated_at=updated_at,
+                taken_at=_parse_dt(exif.get("dateTimeOriginal")),
+                latitude=exif.get("latitude"),
+                longitude=exif.get("longitude"),
+                file_created_at=_parse_dt(item.get("fileCreatedAt")),
+            )
+        except ImmichClientError:
+            raise
+        except (KeyError, TypeError, ValueError) as e:
+            raise ImmichClientError(
+                f"failed to parse asset {asset_id!r}: {e!r}"
+            ) from e
 
 
 __all__ = ["ImmichClient", "ImmichClientError"]
