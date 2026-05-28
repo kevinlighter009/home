@@ -1,0 +1,41 @@
+{
+  "assets": {
+    "total": 2,
+    "count": 2,
+    "items": [
+      {
+        "id": "asset-uuid-1",
+        "ownerId": "user-uuid-a",
+        "originalFileName": "IMG_0001.HEIC",
+        "fileCreatedAt": "2026-05-27T18:42:11.000Z",
+        "updatedAt": "2026-05-27T18:42:15.000Z",
+        "type": "IMAGE",
+        "exifInfo": {
+          "latitude": 37.7749,
+          "longitude": -122.4194,
+          "dateTimeOriginal": "2026-05-27T11:42:09.000-07:00",
+          "make": "Apple",
+          "model": "iPhone 15 Pro"
+        }
+      },
+      {
+        "id": "asset-uuid-2",
+        "ownerId": "user-uuid-b",
+        "originalFileName": "IMG_0002.HEIC",
+        "fileCreatedAt": "2026-05-28T09:00:00.000Z",
+        "updatedAt": "2026-05-28T09:00:03.000Z",
+        "type": "IMAGE",
+        "exifInfo": {
+          "latitude": null,
+          "longitude": null,
+          "dateTimeOriginal": null,
+          "make": "Apple",
+          "model": "iPhone 13"
+        }
+      }
+    ],
+    "facets": [],
+    "nextPage": null
+  },
+  "albums": {"total": 0, "count": 0, "items": [], "facets": []}
+}
