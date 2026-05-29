@@ -24,6 +24,9 @@ from home_photo_repo.immich_types import ImmichAsset
 from home_photo_repo.llm.factory import build_provider
 from home_photo_repo.llm.providers.base import VisionLLMProvider
 from home_photo_repo.llm.rate_limiter import TokenBucket
+from home_photo_repo.places.google_places import GooglePlacesClient
+from home_photo_repo.places.matcher import PlaceMatcher
+from home_photo_repo.places.repository import PlacesRepository
 from home_photo_repo.settings_factory import load_settings
 from home_photo_repo.worker.cursor import read_cursor, write_cursor
 from home_photo_repo.worker.pipeline import ProcessResult, process_asset
@@ -67,6 +70,7 @@ def run_once(
     rate_limiter: TokenBucket | None = None,
     stage_a_food_threshold: float = 0.6,
     stage_b_review_threshold: float = 0.7,
+    place_matcher: PlaceMatcher | None = None,
 ) -> RunSummary:
     """Poll Immich until it returns a non-full batch; process every asset."""
     summary = RunSummary()
@@ -105,6 +109,7 @@ def run_once(
                         rate_limiter=rate_limiter,
                         stage_a_food_threshold=stage_a_food_threshold,
                         stage_b_review_threshold=stage_b_review_threshold,
+                        place_matcher=place_matcher,
                     )
                 except Exception as e:  # noqa: BLE001 - per-asset isolation
                     summary.errors += 1
@@ -174,13 +179,30 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
         rate_per_minute=settings.anthropic_rate_limit_per_minute,
         capacity=max(1, settings.anthropic_rate_limit_per_minute // 4),
     )
+
+    # Place matcher: build Google client only if a real key is configured.
+    google_key = settings.google_places_api_key.get_secret_value()
+    google_client = (
+        GooglePlacesClient(api_key=google_key)
+        if google_key and google_key != "replace_me"
+        else None
+    )
+    place_matcher = PlaceMatcher(
+        repo=PlacesRepository(conn),
+        google=google_client,
+        ambiguous_threshold_m=settings.place_match_ambiguous_threshold_m,
+        search_radius_m=settings.google_places_search_radius_m,
+    )
+
     log.info(
-        "worker starting: poll_interval=%ss batch_size=%s db=%s stage_a=%s stage_b=%s",
+        "worker starting: poll_interval=%ss batch_size=%s db=%s "
+        "stage_a=%s stage_b=%s google_places=%s",
         settings.poll_interval_seconds,
         settings.backfill_batch_size,
         settings.db_path,
         stage_a_provider.name,
         stage_b_provider.name,
+        "enabled" if google_client else "disabled (curated places only)",
     )
     try:
         while True:
@@ -192,6 +214,7 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
                 rate_limiter=rate_limiter,
                 stage_a_food_threshold=settings.stage_a_food_threshold,
                 stage_b_review_threshold=settings.stage_b_confidence_review_threshold,
+                place_matcher=place_matcher,
             )
             log.info(
                 "run complete: seen=%d processed=%d errors=%d",
@@ -203,6 +226,8 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
     except KeyboardInterrupt:
         log.info("worker shutting down (KeyboardInterrupt)")
     finally:
+        if google_client is not None:
+            google_client.close()
         immich.close()
         conn.close()
 
