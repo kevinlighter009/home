@@ -1,0 +1,6 @@
+# Optional MLX local-model dependencies.
+# Install with: pip install -r requirements-mlx.txt
+# (Apple Silicon only — mlx-vlm requires Metal.)
+
+-r requirements.txt
+mlx-vlm>=0.1.20
