@@ -34,6 +34,9 @@ class FakeImmich:
             return []
         return self._batches.pop(0)
 
+    def get_thumbnail(self, asset_id: str, *, size: str = "thumbnail") -> bytes:
+        return b"thumb-bytes"
+
 
 def _conn(tmp_path: Path):
     c = get_connection(tmp_path / "app.sqlite")
@@ -124,3 +127,39 @@ def test_run_once_on_immich_error_records_error_and_does_not_advance(tmp_path: P
     row = conn.execute("SELECT errors, notes FROM worker_runs").fetchone()
     assert row["errors"] == 1
     assert "simulated outage" in (row["notes"] or "")
+
+
+def test_run_once_with_providers_invokes_stage_a(tmp_path: Path) -> None:
+    from home_photo_repo.llm.providers.base import ProviderResult
+
+    class StubProvider:
+        name = "stub"
+
+        def __init__(self, parsed: dict[str, Any]) -> None:
+            self.parsed = parsed
+            self.calls = 0
+
+        def classify(self, image_bytes, prompt, response_schema, max_tokens=512):
+            self.calls += 1
+            return ProviderResult(
+                parsed=self.parsed, raw="{}", latency_ms=1,
+                input_tokens=1, output_tokens=1, model=f"stub:{self.name}",
+            )
+
+    conn = _conn(tmp_path)
+    a = _asset("a", 1)
+    fake = FakeImmich(batches=[[a]])
+    stage_a = StubProvider({"is_food": False, "confidence": 0.9})
+    stage_b = StubProvider({"dish_name": "x", "cuisine": "y", "confidence": 0.9})
+
+    summary = run_once(
+        conn, fake, batch_size=10,
+        now=datetime(2026, 5, 28, 13, 0, 0, tzinfo=UTC),
+        stage_a_provider=stage_a, stage_b_provider=stage_b,
+    )
+
+    assert summary.assets_processed == 1
+    assert stage_a.calls == 1
+    assert stage_b.calls == 0  # not food
+    row = conn.execute("SELECT stage_a_is_food FROM photo_analysis").fetchone()
+    assert row["stage_a_is_food"] == 0

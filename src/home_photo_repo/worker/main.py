@@ -21,6 +21,9 @@ from home_photo_repo.config import Settings
 from home_photo_repo.db import apply_migrations, get_connection
 from home_photo_repo.immich_client import ImmichClient, ImmichClientError
 from home_photo_repo.immich_types import ImmichAsset
+from home_photo_repo.llm.factory import build_provider
+from home_photo_repo.llm.providers.base import VisionLLMProvider
+from home_photo_repo.llm.rate_limiter import TokenBucket
 from home_photo_repo.settings_factory import load_settings
 from home_photo_repo.worker.cursor import read_cursor, write_cursor
 from home_photo_repo.worker.pipeline import ProcessResult, process_asset
@@ -37,6 +40,8 @@ class _ImmichLike(Protocol):
         size: int = ...,
         order: str = ...,
     ) -> list[ImmichAsset]: ...
+
+    def get_thumbnail(self, asset_id: str, *, size: str = ...) -> bytes: ...
 
 
 @dataclass
@@ -57,6 +62,11 @@ def run_once(
     *,
     batch_size: int,
     now: datetime | None = None,
+    stage_a_provider: VisionLLMProvider | None = None,
+    stage_b_provider: VisionLLMProvider | None = None,
+    rate_limiter: TokenBucket | None = None,
+    stage_a_food_threshold: float = 0.6,
+    stage_b_review_threshold: float = 0.7,
 ) -> RunSummary:
     """Poll Immich until it returns a non-full batch; process every asset."""
     summary = RunSummary()
@@ -85,7 +95,17 @@ def run_once(
             for asset in assets:
                 summary.assets_seen += 1
                 try:
-                    result = process_asset(conn, asset, now=current_time)
+                    result = process_asset(
+                        conn,
+                        asset,
+                        now=current_time,
+                        immich=immich,
+                        stage_a_provider=stage_a_provider,
+                        stage_b_provider=stage_b_provider,
+                        rate_limiter=rate_limiter,
+                        stage_a_food_threshold=stage_a_food_threshold,
+                        stage_b_review_threshold=stage_b_review_threshold,
+                    )
                 except Exception as e:  # noqa: BLE001 - per-asset isolation
                     summary.errors += 1
                     summary.last_error = f"{asset.id}: {e!r}"
@@ -148,15 +168,31 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
         base_url=str(settings.immich_base_url),
         api_key=settings.immich_api_key.get_secret_value(),
     )
+    stage_a_provider = build_provider("stage_a", settings)
+    stage_b_provider = build_provider("stage_b", settings)
+    rate_limiter = TokenBucket(
+        rate_per_minute=settings.anthropic_rate_limit_per_minute,
+        capacity=max(1, settings.anthropic_rate_limit_per_minute // 4),
+    )
     log.info(
-        "worker starting: poll_interval=%ss batch_size=%s db=%s",
+        "worker starting: poll_interval=%ss batch_size=%s db=%s stage_a=%s stage_b=%s",
         settings.poll_interval_seconds,
         settings.backfill_batch_size,
         settings.db_path,
+        stage_a_provider.name,
+        stage_b_provider.name,
     )
     try:
         while True:
-            summary = run_once(conn, immich, batch_size=settings.backfill_batch_size)
+            summary = run_once(
+                conn, immich,
+                batch_size=settings.backfill_batch_size,
+                stage_a_provider=stage_a_provider,
+                stage_b_provider=stage_b_provider,
+                rate_limiter=rate_limiter,
+                stage_a_food_threshold=settings.stage_a_food_threshold,
+                stage_b_review_threshold=settings.stage_b_confidence_review_threshold,
+            )
             log.info(
                 "run complete: seen=%d processed=%d errors=%d",
                 summary.assets_seen,
