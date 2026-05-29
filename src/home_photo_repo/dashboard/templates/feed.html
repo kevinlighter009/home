@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Feed — home_photo_repo{% endblock %}
+{% block content %}
+<div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+  <h2 style="margin: 0;">Recent food photos ({{ total }})</h2>
+  <form method="get" action="/feed" style="margin: 0;">
+    <select name="venue_type" onchange="this.form.submit()">
+      <option value="" {% if not venue_filter %}selected{% endif %}>All venues</option>
+      <option value="home" {% if venue_filter == 'home' %}selected{% endif %}>Home</option>
+      <option value="office" {% if venue_filter == 'office' %}selected{% endif %}>Office</option>
+      <option value="restaurant" {% if venue_filter == 'restaurant' %}selected{% endif %}>Restaurant</option>
+      <option value="friend_place" {% if venue_filter == 'friend_place' %}selected{% endif %}>Friend's place</option>
+      <option value="outdoor" {% if venue_filter == 'outdoor' %}selected{% endif %}>Outdoor</option>
+      <option value="unknown" {% if venue_filter == 'unknown' %}selected{% endif %}>Unknown</option>
+    </select>
+  </form>
+</div>
+
+<div class="grid">
+  {% for p in photos %}
+    <div class="photo-card">
+      <img src="/proxy/thumbnail/{{ p.immich_asset_id }}" alt="{{ p.dish_name }}" loading="lazy" />
+      <div class="meta">
+        <div class="dish">{{ p.dish_name or '(unclassified)' }}</div>
+        <div class="venue">
+          {{ p.cuisine or '' }}
+          {% if p.taken_at %} · {{ p.taken_at[:10] }}{% endif %}
+        </div>
+        {% if p.place_id %}
+          <a href="/place/{{ p.place_id }}" style="font-size: 11px;">view venue</a>
+        {% endif %}
+        {% if p.review_status == 'needs_review' %}
+          <span class="badge warn">review</span>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="card" style="grid-column: 1 / -1;">No food photos match.</div>
+  {% endfor %}
+</div>
+
+<div class="pagination">
+  <a href="?page={{ page - 1 }}{% if venue_filter %}&venue_type={{ venue_filter }}{% endif %}"
+     class="{% if not has_prev %}disabled{% endif %}">← Previous</a>
+  <span style="padding: 6px 12px; color: var(--muted);">Page {{ page }}</span>
+  <a href="?page={{ page + 1 }}{% if venue_filter %}&venue_type={{ venue_filter }}{% endif %}"
+     class="{% if not has_next %}disabled{% endif %}">Next →</a>
+</div>
+{% endblock %}
