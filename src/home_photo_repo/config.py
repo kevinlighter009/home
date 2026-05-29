@@ -54,8 +54,12 @@ class Settings(BaseSettings):
 
     # MLX placeholder
     mlx_base_url: str = "http://localhost:8081/v1"
-    mlx_stage_a_model: str = "mlx-community/Qwen2-VL-2B-Instruct-4bit"
-    mlx_stage_b_model: str = "mlx-community/Qwen2-VL-7B-Instruct-4bit"
+    # Default to a single 7B model that comfortably fits ~5 GB on a 16+ GB Mac
+    # and serves both stages. mlx_vlm.server hosts ONE model at a time, so
+    # these two values must match unless you run two MLX servers on
+    # different ports. See docs/operations.md for the multi-model setup.
+    mlx_stage_a_model: str = "mlx-community/Qwen2.5-VL-7B-Instruct-4bit"
+    mlx_stage_b_model: str = "mlx-community/Qwen2.5-VL-7B-Instruct-4bit"
 
     @property
     def db_path(self) -> Path:

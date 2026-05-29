@@ -15,7 +15,7 @@
         <string>-m</string>
         <string>mlx_vlm.server</string>
         <string>--model</string>
-        <string>mlx-community/Qwen2-VL-2B-Instruct-4bit</string>
+        <string>mlx-community/Qwen2.5-VL-7B-Instruct-4bit</string>
         <string>--port</string>
         <string>8081</string>
     </array>
