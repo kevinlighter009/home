@@ -217,6 +217,25 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
             stage_b_provider, image_bytes=image_bytes, candidates=candidates,
         )
 
+    # Friendly heads-up: probe MLX once at startup so the operator sees
+    # immediately whether the local server is reachable.
+    if "mlx" in (settings.llm_stage_a_provider, settings.llm_stage_b_provider):
+        try:
+            import httpx as _httpx
+            r = _httpx.get(f"{settings.mlx_base_url}/models", timeout=2.0)
+            if r.status_code == 200:
+                log.info("MLX server reachable at %s", settings.mlx_base_url)
+            else:
+                log.warning(
+                    "MLX server at %s returned %s — fallback will be used per-call",
+                    settings.mlx_base_url, r.status_code,
+                )
+        except Exception as e:  # noqa: BLE001
+            log.warning(
+                "MLX server at %s unreachable (%s) — fallback will be used per-call",
+                settings.mlx_base_url, e,
+            )
+
     log.info(
         "worker starting: poll_interval=%ss batch_size=%s db=%s "
         "stage_a=%s stage_b=%s google_places=%s",
