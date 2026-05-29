@@ -42,6 +42,10 @@ class MatchResult:
     source: str
     needs_review: bool
     notes: str | None = None
+    # Populated only when Google fallback returned multiple candidates within
+    # the ambiguity threshold. The pipeline can pass these to the venue
+    # disambiguator for an LLM tiebreaker.
+    ambiguous_candidates: tuple[NearbyPlace, ...] = ()
 
 
 VALID_VENUE_TYPES: tuple[str, ...] = (

@@ -217,3 +217,39 @@ def test_match_classifies_cafe_correctly_when_cached_from_google(tmp_path: Path)
     assert cached.type == "restaurant"
     assert cached.notes is not None
     assert "cafe" in cached.notes  # raw types preserved
+
+
+def test_match_carries_ambiguous_candidates_on_google_ambiguity(tmp_path: Path) -> None:
+    """When Google returns multiple candidates within the ambiguity
+    threshold, MatchResult.ambiguous_candidates lists them."""
+    conn = _conn(tmp_path)
+    a = NearbyPlace(
+        google_place_id="gp-a", name="A", latitude=37.762, longitude=-122.434,
+        address=None, types=("restaurant",),
+    )
+    b = NearbyPlace(
+        google_place_id="gp-b", name="B", latitude=37.76201, longitude=-122.43401,
+        address=None, types=("restaurant",),
+    )
+    google = FakeGoogleClient(results=[a, b])
+    m = _matcher(conn, google=google, ambiguous_threshold_m=50)
+
+    result = m.match(latitude=37.762, longitude=-122.434)
+
+    assert result.needs_review is True
+    assert len(result.ambiguous_candidates) == 2
+    candidate_ids = {c.google_place_id for c in result.ambiguous_candidates}
+    assert candidate_ids == {"gp-a", "gp-b"}
+
+
+def test_match_returns_empty_ambiguous_candidates_when_unambiguous(tmp_path: Path) -> None:
+    conn = _conn(tmp_path)
+    a = NearbyPlace(
+        google_place_id="gp-a", name="A", latitude=37.762, longitude=-122.434,
+        address=None, types=("restaurant",),
+    )
+    google = FakeGoogleClient(results=[a])
+    m = _matcher(conn, google=google, ambiguous_threshold_m=50)
+
+    result = m.match(latitude=37.762, longitude=-122.434)
+    assert result.ambiguous_candidates == ()

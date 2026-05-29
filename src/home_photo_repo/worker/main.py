@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,9 +29,14 @@ from home_photo_repo.immich_types import ImmichAsset
 from home_photo_repo.llm.factory import build_provider
 from home_photo_repo.llm.providers.base import VisionLLMProvider
 from home_photo_repo.llm.rate_limiter import TokenBucket
+from home_photo_repo.llm.venue_disambiguator import (
+    DisambiguatedVenue,
+    disambiguate,
+)
 from home_photo_repo.places.google_places import GooglePlacesClient
 from home_photo_repo.places.matcher import PlaceMatcher
 from home_photo_repo.places.repository import PlacesRepository
+from home_photo_repo.places.types import NearbyPlace
 from home_photo_repo.settings_factory import load_settings
 from home_photo_repo.worker.cursor import read_cursor, write_cursor
 from home_photo_repo.worker.pipeline import ProcessResult, process_asset
@@ -75,6 +81,9 @@ def run_once(
     stage_a_food_threshold: float = DEFAULT_STAGE_A_FOOD_THRESHOLD,
     stage_b_review_threshold: float = DEFAULT_STAGE_B_REVIEW_THRESHOLD,
     place_matcher: PlaceMatcher | None = None,
+    venue_disambiguator: Callable[
+        [bytes, list[NearbyPlace]], DisambiguatedVenue
+    ] | None = None,
 ) -> RunSummary:
     """Poll Immich until it returns a non-full batch; process every asset."""
     summary = RunSummary()
@@ -114,6 +123,7 @@ def run_once(
                         stage_a_food_threshold=stage_a_food_threshold,
                         stage_b_review_threshold=stage_b_review_threshold,
                         place_matcher=place_matcher,
+                        venue_disambiguator=venue_disambiguator,
                     )
                 except Exception as e:  # noqa: BLE001 - per-asset isolation
                     summary.errors += 1
@@ -200,6 +210,13 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
         search_radius_m=settings.google_places_search_radius_m,
     )
 
+    def _disambiguator_fn(
+        image_bytes: bytes, candidates: list[NearbyPlace]
+    ) -> DisambiguatedVenue:
+        return disambiguate(
+            stage_b_provider, image_bytes=image_bytes, candidates=candidates,
+        )
+
     log.info(
         "worker starting: poll_interval=%ss batch_size=%s db=%s "
         "stage_a=%s stage_b=%s google_places=%s",
@@ -221,6 +238,7 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
                 stage_a_food_threshold=settings.stage_a_food_threshold,
                 stage_b_review_threshold=settings.stage_b_confidence_review_threshold,
                 place_matcher=place_matcher,
+                venue_disambiguator=_disambiguator_fn,
             )
             log.info(
                 "run complete: seen=%d processed=%d errors=%d",

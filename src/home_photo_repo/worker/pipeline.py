@@ -15,6 +15,7 @@ from __future__ import annotations
 import enum
 import logging
 import sqlite3
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -29,8 +30,14 @@ from home_photo_repo.llm.providers.base import ProviderError, VisionLLMProvider
 from home_photo_repo.llm.rate_limiter import TokenBucket
 from home_photo_repo.llm.stage_a import StageAResult, run_stage_a
 from home_photo_repo.llm.stage_b import StageBResult, run_stage_b
+from home_photo_repo.llm.venue_disambiguator import (
+    DisambiguatedVenue,
+    disambiguate,  # noqa: F401 - exported for users who want to compose manually
+)
 from home_photo_repo.places.matcher import PlaceMatcher
-from home_photo_repo.places.types import MatchResult
+from home_photo_repo.places.types import MatchResult, NearbyPlace
+
+DisambiguatorFn = Callable[[bytes, list[NearbyPlace]], DisambiguatedVenue]
 
 READINESS_MAX_AGE: timedelta = timedelta(minutes=10)
 
@@ -68,6 +75,7 @@ def process_asset(
     stage_a_food_threshold: float = DEFAULT_STAGE_A_FOOD_THRESHOLD,
     stage_b_review_threshold: float = DEFAULT_STAGE_B_REVIEW_THRESHOLD,
     place_matcher: PlaceMatcher | None = None,
+    venue_disambiguator: DisambiguatorFn | None = None,
 ) -> ProcessResult:
     """Process one asset.
 
@@ -79,6 +87,7 @@ def process_asset(
     callers continue to work.
     """
     current_time = now or _utcnow()
+    preview_bytes: bytes | None = None
 
     # Idempotency: skip if already present AND already classified.
     existing = conn.execute(
@@ -197,6 +206,28 @@ def process_asset(
         and asset.longitude is not None
     ):
         match = place_matcher.match(latitude=asset.latitude, longitude=asset.longitude)
+        # If matcher returned ambiguous Google candidates AND we have a
+        # disambiguator AND we have preview bytes (already fetched for Stage B),
+        # let the LLM pick among the candidates.
+        if (
+            match.needs_review
+            and match.ambiguous_candidates
+            and venue_disambiguator is not None
+            and preview_bytes is not None
+        ):
+            try:
+                pick: DisambiguatedVenue | None = venue_disambiguator(
+                    preview_bytes, list(match.ambiguous_candidates)
+                )
+            except Exception:  # noqa: BLE001
+                log.exception("disambiguator failed for asset %s", asset.id)
+                pick = None
+            if (
+                pick is not None
+                and pick.google_place_id is not None
+                and pick.confidence >= 0.6
+            ):
+                match = _refine_match_from_disambiguation(match, pick)
         _record_venue_match(conn, asset.id, match, current_time)
 
     return ProcessResult.STAGE_A_AND_B_DONE
@@ -336,7 +367,8 @@ def _record_venue_match(
                    place_id               = ?,
                    place_match_source     = ?,
                    place_match_distance_m = ?,
-                   venue_resolved_at      = ?
+                   venue_resolved_at      = ?,
+                   review_notes           = ?
              WHERE immich_asset_id = ?
             """,
             (
@@ -345,9 +377,40 @@ def _record_venue_match(
                 match.source,
                 match.distance_m,
                 now.isoformat(),
+                match.notes,
                 asset_id,
             ),
         )
+
+
+def _refine_match_from_disambiguation(
+    original: MatchResult,
+    pick: DisambiguatedVenue,
+) -> MatchResult:
+    """Replace the matcher's nearest-by-haversine pick with the LLM's
+    candidate of choice. The picked place_id must be one of the candidates."""
+    matching = next(
+        (
+            c for c in original.ambiguous_candidates
+            if c.google_place_id == pick.google_place_id
+        ),
+        None,
+    )
+    if matching is None:
+        # Disambiguator returned an unknown id — keep original.
+        return original
+    return MatchResult(
+        place_id=f"gplaces:{matching.google_place_id}",
+        venue_type="restaurant",
+        distance_m=original.distance_m,
+        source="llm_disambiguated",
+        needs_review=False,
+        notes=(
+            f"disambiguated from {len(original.ambiguous_candidates)} candidates "
+            f"(conf={pick.confidence:.2f})"
+        ),
+        ambiguous_candidates=original.ambiguous_candidates,
+    )
 
 
 __all__ = ["READINESS_MAX_AGE", "ProcessResult", "process_asset"]

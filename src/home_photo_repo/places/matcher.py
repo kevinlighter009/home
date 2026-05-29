@@ -153,6 +153,7 @@ class PlaceMatcher:
             source="google_places",
             needs_review=ambiguous,
             notes=notes,
+            ambiguous_candidates=tuple(ranked) if ambiguous else (),
         )
 
     def _resolve_local(
