@@ -31,6 +31,9 @@ def create_app(
 
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
+    from home_photo_repo.dashboard.routes import proxy
+    app.include_router(proxy.router)
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
