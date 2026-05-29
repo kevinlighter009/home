@@ -45,5 +45,5 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = "src"
-packages = ["home_photo_repo"]
+mypy_path = ["src", "."]
+packages = ["home_photo_repo", "launchd"]

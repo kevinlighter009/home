@@ -1,4 +1,4 @@
-.PHONY: bootstrap ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard
+.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -57,3 +57,14 @@ dev-dashboard: ensure-db
 
 smoke-dashboard:
 	$(PYTHON) scripts/smoke_dashboard.py
+
+install-launchd:
+	$(PYTHON) -m launchd.install_launchd
+
+uninstall-launchd:
+	$(PYTHON) -m launchd.uninstall_launchd
+
+logs:
+	@LOG_DIR=$$HOME/Library/Logs/home_photo_repo; \
+	test -d "$$LOG_DIR" || (echo "log dir $$LOG_DIR does not exist yet — has install-launchd run?" && exit 1); \
+	tail -f $$LOG_DIR/*.log
