@@ -164,6 +164,47 @@ def test_search_metadata_filters_already_seen_with_last_id() -> None:
     assert assets[0].id == "asset-uuid-2"
 
 
+@respx.mock
+def test_get_thumbnail_returns_bytes() -> None:
+    fake_bytes = b"\x89PNG fake binary"
+    respx.get(
+        "http://immich.local:2283/api/assets/asset-1/thumbnail"
+    ).mock(
+        return_value=httpx.Response(200, content=fake_bytes, headers={"content-type": "image/jpeg"})
+    )
+    data = _client().get_thumbnail("asset-1", size="thumbnail")
+    assert data == fake_bytes
+
+
+@respx.mock
+def test_get_thumbnail_passes_size_param() -> None:
+    route = respx.get(
+        "http://immich.local:2283/api/assets/asset-1/thumbnail"
+    ).mock(return_value=httpx.Response(200, content=b"x"))
+    _client().get_thumbnail("asset-1", size="preview")
+    # respx matched the URL; check query string carried `size=preview`
+    assert route.calls.last.request.url.params["size"] == "preview"
+
+
+@respx.mock
+def test_get_thumbnail_404_raises() -> None:
+    respx.get(
+        "http://immich.local:2283/api/assets/asset-1/thumbnail"
+    ).mock(return_value=httpx.Response(404))
+    with pytest.raises(ImmichClientError):
+        _client().get_thumbnail("asset-1")
+
+
+@respx.mock
+def test_get_original_returns_bytes() -> None:
+    fake_bytes = b"\x89PNG bigger fake"
+    respx.get(
+        "http://immich.local:2283/api/assets/asset-1/original"
+    ).mock(return_value=httpx.Response(200, content=fake_bytes))
+    data = _client().get_original("asset-1")
+    assert data == fake_bytes
+
+
 def test_client_context_manager_closes() -> None:
     """Using the client as a context manager calls close on exit."""
     closed = {"called": False}

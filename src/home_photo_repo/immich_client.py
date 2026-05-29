@@ -86,6 +86,37 @@ class ImmichClient:
         # Drop items the cursor has already passed.
         return [a for a in parsed if (a.updated_at, a.id) > (updated_after, last_id)]
 
+    def get_thumbnail(self, asset_id: str, *, size: str = "thumbnail") -> bytes:
+        """Fetch an asset's thumbnail or preview.
+
+        `size` is one of:
+          - "thumbnail" (~250px, fast, Stage A)
+          - "preview" (~1440px, Stage B)
+        """
+        if size not in ("thumbnail", "preview"):
+            raise ValueError(f"invalid size {size!r}; expected 'thumbnail' or 'preview'")
+        return self._get_bytes(
+            f"/api/assets/{asset_id}/thumbnail", params={"size": size}
+        )
+
+    def get_original(self, asset_id: str) -> bytes:
+        """Fetch an asset's original full-resolution bytes."""
+        return self._get_bytes(f"/api/assets/{asset_id}/original")
+
+    def _get_bytes(
+        self, path: str, *, params: dict[str, str] | None = None
+    ) -> bytes:
+        url = f"{self._base_url}{path}"
+        try:
+            response = self._client.get(url, headers=self._headers, params=params or {})
+        except httpx.HTTPError as e:
+            raise ImmichClientError(f"network error calling {path}: {e!r}") from e
+        if response.status_code >= 400:
+            raise ImmichClientError(
+                f"Immich {path} returned {response.status_code}"
+            )
+        return response.content
+
     # --- internals ----------------------------------------------------------
 
     def _post(self, path: str, *, json: dict[str, Any]) -> dict[str, Any]:
