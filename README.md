@@ -10,6 +10,10 @@ photo: Stage A (Claude Haiku 4.5) decides whether the photo is food, and
 food photos additionally get Stage B (Claude Sonnet 4.5) which fills in
 `dish_name` and `cuisine`. Venue / restaurant assignment is Plan 3.
 
+**👉 New to this project? See [`docs/SETUP.md`](docs/SETUP.md) for the
+complete fresh-Mac setup guide (Docker, Python, Immich, Anthropic key,
+iPhone app — everything).**
+
 See `docs/specs/2026-05-28-home-photo-repo-design.md` for the full design
 and `docs/plans/` for per-phase implementation plans.
 
