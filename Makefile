@@ -1,4 +1,4 @@
-.PHONY: bootstrap ensure-db dev-worker test lint typecheck format smoke-immich smoke-llm smoke-places
+.PHONY: bootstrap ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -51,3 +51,9 @@ smoke-llm:
 
 smoke-places:
 	$(PYTHON) scripts/smoke_places.py $(ARGS)
+
+dev-dashboard: ensure-db
+	$(PYTHON) -m home_photo_repo.dashboard.main
+
+smoke-dashboard:
+	$(PYTHON) scripts/smoke_dashboard.py
