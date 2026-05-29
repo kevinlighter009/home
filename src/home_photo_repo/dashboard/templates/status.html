@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Status — home_photo_repo{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Pipeline summary</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
+    <div><div style="color: var(--muted); font-size: 12px;">Total assets</div><div style="font-size: 24px;">{{ counts.total or 0 }}</div></div>
+    <div><div style="color: var(--muted); font-size: 12px;">Classified</div><div style="font-size: 24px;">{{ counts.classified or 0 }}</div></div>
+    <div><div style="color: var(--muted); font-size: 12px;">Food</div><div style="font-size: 24px;">{{ counts.food or 0 }}</div></div>
+    <div><div style="color: var(--muted); font-size: 12px;">With dish</div><div style="font-size: 24px;">{{ counts.with_dish or 0 }}</div></div>
+    <div><div style="color: var(--muted); font-size: 12px;">With venue</div><div style="font-size: 24px;">{{ counts.with_venue or 0 }}</div></div>
+    <div><div style="color: var(--muted); font-size: 12px;">Needs review</div><div style="font-size: 24px; color: var(--warn);">{{ counts.needs_review or 0 }}</div></div>
+    <div><div style="color: var(--muted); font-size: 12px;">Errors</div><div style="font-size: 24px; color: var(--warn);">{{ counts.errored or 0 }}</div></div>
+  </div>
+  {% if cursor %}
+    <div style="margin-top: 16px; color: var(--muted); font-size: 12px;">
+      Cursor: <code>{{ cursor }}</code>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Recent worker runs</h2>
+  <table>
+    <thead>
+      <tr><th>Started</th><th>Finished</th><th>Seen</th><th>Processed</th><th>Errors</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+        <tr>
+          <td>{{ r.started_at }}</td>
+          <td>{{ r.finished_at or '(running)' }}</td>
+          <td>{{ r.assets_seen }}</td>
+          <td>{{ r.assets_processed }}</td>
+          <td {% if r.errors %}style="color: var(--warn);"{% endif %}>{{ r.errors }}</td>
+          <td style="color: var(--muted); font-size: 12px;">{{ r.notes or '' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" style="color: var(--muted);">No runs recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
