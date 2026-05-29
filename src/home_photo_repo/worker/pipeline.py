@@ -18,6 +18,10 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
+from home_photo_repo.config import (
+    DEFAULT_STAGE_A_FOOD_THRESHOLD,
+    DEFAULT_STAGE_B_REVIEW_THRESHOLD,
+)
 from home_photo_repo.immich_client import ImmichAssetNotReadyError
 from home_photo_repo.immich_types import ImmichAsset
 from home_photo_repo.llm.prompts import STAGE_A_VERSION, STAGE_B_VERSION
@@ -60,8 +64,8 @@ def process_asset(
     stage_a_provider: VisionLLMProvider | None = None,
     stage_b_provider: VisionLLMProvider | None = None,
     rate_limiter: TokenBucket | None = None,
-    stage_a_food_threshold: float = 0.6,
-    stage_b_review_threshold: float = 0.7,
+    stage_a_food_threshold: float = DEFAULT_STAGE_A_FOOD_THRESHOLD,
+    stage_b_review_threshold: float = DEFAULT_STAGE_B_REVIEW_THRESHOLD,
     place_matcher: PlaceMatcher | None = None,
 ) -> ProcessResult:
     """Process one asset.

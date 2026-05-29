@@ -10,6 +10,11 @@ from pathlib import Path
 from pydantic import HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Single source of truth for pipeline thresholds. Settings and pipeline both
+# read from these so defaults stay in lockstep.
+DEFAULT_STAGE_A_FOOD_THRESHOLD: float = 0.6
+DEFAULT_STAGE_B_REVIEW_THRESHOLD: float = 0.7
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -33,8 +38,8 @@ class Settings(BaseSettings):
     # Worker tunables
     poll_interval_seconds: int = 300
     backfill_batch_size: int = 100
-    stage_a_food_threshold: float = 0.6
-    stage_b_confidence_review_threshold: float = 0.7
+    stage_a_food_threshold: float = DEFAULT_STAGE_A_FOOD_THRESHOLD
+    stage_b_confidence_review_threshold: float = DEFAULT_STAGE_B_REVIEW_THRESHOLD
     place_match_ambiguous_threshold_m: int = 50
     curated_place_default_radius_m: int = 50
     google_places_search_radius_m: int = 150
@@ -57,4 +62,8 @@ class Settings(BaseSettings):
         return self.ssd_data_dir / "db" / "app.sqlite"
 
 
-__all__ = ["Settings"]
+__all__ = [
+    "DEFAULT_STAGE_A_FOOD_THRESHOLD",
+    "DEFAULT_STAGE_B_REVIEW_THRESHOLD",
+    "Settings",
+]

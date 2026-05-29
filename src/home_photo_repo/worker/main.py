@@ -17,7 +17,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-from home_photo_repo.config import Settings
+from home_photo_repo.config import (
+    DEFAULT_STAGE_A_FOOD_THRESHOLD,
+    DEFAULT_STAGE_B_REVIEW_THRESHOLD,
+    Settings,
+)
 from home_photo_repo.db import apply_migrations, get_connection
 from home_photo_repo.immich_client import ImmichClient, ImmichClientError
 from home_photo_repo.immich_types import ImmichAsset
@@ -68,8 +72,8 @@ def run_once(
     stage_a_provider: VisionLLMProvider | None = None,
     stage_b_provider: VisionLLMProvider | None = None,
     rate_limiter: TokenBucket | None = None,
-    stage_a_food_threshold: float = 0.6,
-    stage_b_review_threshold: float = 0.7,
+    stage_a_food_threshold: float = DEFAULT_STAGE_A_FOOD_THRESHOLD,
+    stage_b_review_threshold: float = DEFAULT_STAGE_B_REVIEW_THRESHOLD,
     place_matcher: PlaceMatcher | None = None,
 ) -> RunSummary:
     """Poll Immich until it returns a non-full batch; process every asset."""
