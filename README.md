@@ -5,14 +5,13 @@ Local home-photo ingestion + analysis service. Sits on top of a self-hosted
 recognition and venue tagging (restaurant via GPS / home / office / etc.),
 plus a localhost dashboard.
 
-This is **Plan 5 (Operations)** — and the project is feature-complete.
-The worker and dashboard auto-start at login via macOS launchd, a nightly
-Postgres backup keeps a rotating 14-day history, and the codebase
-supports migration to a new Mac via a single `make bootstrap-existing`
-once the SSD is plugged in.
+This is **Plan 6 (Polish & Disambiguator)** — the final pass. The follow-up
+backlog from Plans 1–5 has been burned down, and the spec's intended Stage B
+venue disambiguation is now wired up: ambiguous Google Places matches are
+refined by an LLM that sees the photo alongside the candidate list and
+picks the venue with the best visual evidence.
 
-See [`docs/operations.md`](docs/operations.md) for install / uninstall /
-backup / migrate / troubleshooting. See
+See [`docs/operations.md`](docs/operations.md) for day-2 ops and
 [`docs/SETUP.md`](docs/SETUP.md) for the fresh-Mac install walkthrough.
 
 **👉 New to this project? See [`docs/SETUP.md`](docs/SETUP.md) for the
@@ -337,3 +336,6 @@ src/home_photo_repo/
 - **Plan 5** ✅ Done — launchd plists (auto-start at login), nightly
   `pg_dumpall` backup, `bootstrap-existing` for new-Mac migration,
   optional MLX server.
+- **Plan 6** ✅ Done — Follow-up burn-down (worker per-asset isolation,
+  centralized thresholds, MLX code-fence stripping, dashboard polish,
+  backup script refactor, venue disambiguator).
