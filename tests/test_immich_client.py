@@ -13,7 +13,11 @@ import httpx
 import pytest
 import respx
 
-from home_photo_repo.immich_client import ImmichClient, ImmichClientError
+from home_photo_repo.immich_client import (
+    ImmichAssetNotReadyError,
+    ImmichClient,
+    ImmichClientError,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -187,12 +191,29 @@ def test_get_thumbnail_passes_size_param() -> None:
 
 
 @respx.mock
-def test_get_thumbnail_404_raises() -> None:
+def test_get_thumbnail_404_raises_not_ready() -> None:
+    """404 from Immich on a binary endpoint means the underlying processing
+    job hasn't completed; surface as ImmichAssetNotReadyError so callers
+    can defer rather than treat it as a permanent failure."""
     respx.get(
         "http://immich.local:2283/api/assets/asset-1/thumbnail"
     ).mock(return_value=httpx.Response(404))
-    with pytest.raises(ImmichClientError):
+    with pytest.raises(ImmichAssetNotReadyError) as exc_info:
         _client().get_thumbnail("asset-1")
+    assert exc_info.value.status_code == 404
+    # Subclass relationship preserved for callers that catch the parent.
+    assert isinstance(exc_info.value, ImmichClientError)
+
+
+@respx.mock
+def test_get_thumbnail_500_raises_plain_error_with_status() -> None:
+    respx.get(
+        "http://immich.local:2283/api/assets/asset-1/thumbnail"
+    ).mock(return_value=httpx.Response(500))
+    with pytest.raises(ImmichClientError) as exc_info:
+        _client().get_thumbnail("asset-1")
+    assert exc_info.value.status_code == 500
+    assert not isinstance(exc_info.value, ImmichAssetNotReadyError)
 
 
 @respx.mock

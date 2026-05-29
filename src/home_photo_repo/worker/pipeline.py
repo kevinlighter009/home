@@ -18,6 +18,7 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
+from home_photo_repo.immich_client import ImmichAssetNotReadyError
 from home_photo_repo.immich_types import ImmichAsset
 from home_photo_repo.llm.providers.base import ProviderError, VisionLLMProvider
 from home_photo_repo.llm.rate_limiter import TokenBucket
@@ -129,6 +130,13 @@ def process_asset(
             rate_limiter.acquire()
         thumb_bytes = immich.get_thumbnail(asset.id, size="thumbnail")
         stage_a = run_stage_a(stage_a_provider, image_bytes=thumb_bytes)
+    except ImmichAssetNotReadyError as e:
+        # Transient: Immich's thumbnail job hasn't completed yet. When it
+        # does, Immich bumps the asset's updated_at and we'll see it again.
+        # Don't record as error; row stays with stage_a_ran_at NULL so the
+        # next visit retries Stage A cleanly.
+        log.debug("stage_a deferred for asset %s: %s", asset.id, e)
+        return ProcessResult.DEFERRED_NOT_READY
     except ProviderError as e:
         log.warning("stage_a failed for asset %s: %s", asset.id, e)
         _record_stage_a_error(conn, asset.id, str(e))
@@ -152,6 +160,11 @@ def process_asset(
             rate_limiter.acquire()
         preview_bytes = immich.get_thumbnail(asset.id, size="preview")
         stage_b = run_stage_b(stage_b_provider, image_bytes=preview_bytes)
+    except ImmichAssetNotReadyError as e:
+        # Transient: preview job hasn't completed yet (thumbnail done but
+        # preview pending — Immich runs them as separate sub-jobs).
+        log.debug("stage_b deferred for asset %s: %s", asset.id, e)
+        return ProcessResult.DEFERRED_NOT_READY
     except ProviderError as e:
         log.warning("stage_b failed for asset %s: %s", asset.id, e)
         _record_stage_b_error(conn, asset.id, str(e))

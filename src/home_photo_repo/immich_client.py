@@ -13,6 +13,20 @@ from home_photo_repo.immich_types import ImmichAsset
 class ImmichClientError(RuntimeError):
     """Raised when Immich returns a non-2xx response or a malformed body."""
 
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class ImmichAssetNotReadyError(ImmichClientError):
+    """Raised on 404 from asset binary endpoints — Immich's processing job
+    (thumbnail / metadata / transcoding) hasn't completed for this asset yet.
+
+    Distinct from a general `ImmichClientError` so callers can choose to
+    defer + retry instead of treating it as a permanent failure. Immich
+    bumps the asset's `updated_at` when each job completes, so the next
+    poll cycle naturally re-fetches the asset and the call succeeds."""
+
 
 def _parse_dt(value: str | None) -> datetime | None:
     """Parse an ISO-8601 string from Immich and normalize to UTC.
@@ -111,9 +125,15 @@ class ImmichClient:
             response = self._client.get(url, headers=self._headers, params=params or {})
         except httpx.HTTPError as e:
             raise ImmichClientError(f"network error calling {path}: {e!r}") from e
+        if response.status_code == 404:
+            raise ImmichAssetNotReadyError(
+                f"Immich {path} returned 404 (asset processing job pending?)",
+                status_code=404,
+            )
         if response.status_code >= 400:
             raise ImmichClientError(
-                f"Immich {path} returned {response.status_code}"
+                f"Immich {path} returned {response.status_code}",
+                status_code=response.status_code,
             )
         return response.content
 

@@ -280,3 +280,63 @@ def test_pipeline_already_present_short_circuits_after_stage_a(
         stage_b_provider=stage_b,
     )
     assert second is ProcessResult.ALREADY_PRESENT
+
+
+def test_pipeline_defers_when_thumbnail_not_ready(tmp_path: Path) -> None:
+    """If Immich returns 404 for the thumbnail (job hasn't run yet), the
+    pipeline returns DEFERRED_NOT_READY — no error recorded, no Stage A
+    timestamp set, so the next visit (after Immich bumps updated_at on
+    job completion) can retry cleanly."""
+    from home_photo_repo.immich_client import ImmichAssetNotReadyError
+
+    class NotReadyImmich:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_thumbnail(self, asset_id: str, *, size: str = "thumbnail") -> bytes:
+            self.calls += 1
+            raise ImmichAssetNotReadyError(
+                f"Immich /api/assets/{asset_id}/thumbnail returned 404",
+                status_code=404,
+            )
+
+    conn = _conn(tmp_path)
+    stage_a = FakeProvider("anthropic", {"is_food": True, "confidence": 0.95})
+    stage_b = FakeProvider("anthropic", {"dish_name": "x", "cuisine": "y", "confidence": 0.9})
+    immich = NotReadyImmich()
+    a = _asset()
+    now = a.updated_at
+
+    result = process_asset(
+        conn, a, now=now,
+        immich=immich, stage_a_provider=stage_a, stage_b_provider=stage_b,
+    )
+
+    assert result is ProcessResult.DEFERRED_NOT_READY
+    # Row exists (discovered insert happened) but Stage A did NOT complete:
+    row = conn.execute(
+        "SELECT stage_a_ran_at, stage_a_is_food, last_error, error_attempts, review_status "
+        "FROM photo_analysis WHERE immich_asset_id = ?",
+        (a.id,),
+    ).fetchone()
+    assert row is not None
+    assert row["stage_a_ran_at"] is None
+    assert row["stage_a_is_food"] is None
+    assert row["last_error"] is None
+    assert row["error_attempts"] == 0
+    assert row["review_status"] == "auto"  # NOT needs_review
+
+    # A second visit (simulating Immich bumping updated_at after job completes)
+    # with a real thumbnail should now succeed.
+    immich_ready = FakeImmich()
+    result2 = process_asset(
+        conn, a, now=now,
+        immich=immich_ready, stage_a_provider=stage_a, stage_b_provider=stage_b,
+    )
+    assert result2 is ProcessResult.STAGE_A_AND_B_DONE
+    row2 = conn.execute(
+        "SELECT stage_a_ran_at, dish_name FROM photo_analysis WHERE immich_asset_id = ?",
+        (a.id,),
+    ).fetchone()
+    assert row2["stage_a_ran_at"] is not None
+    assert row2["dish_name"] == "x"
