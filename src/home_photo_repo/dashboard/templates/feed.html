@@ -6,12 +6,9 @@
   <form method="get" action="/feed" style="margin: 0;">
     <select name="venue_type" onchange="this.form.submit()">
       <option value="" {% if not venue_filter %}selected{% endif %}>All venues</option>
-      <option value="home" {% if venue_filter == 'home' %}selected{% endif %}>Home</option>
-      <option value="office" {% if venue_filter == 'office' %}selected{% endif %}>Office</option>
-      <option value="restaurant" {% if venue_filter == 'restaurant' %}selected{% endif %}>Restaurant</option>
-      <option value="friend_place" {% if venue_filter == 'friend_place' %}selected{% endif %}>Friend's place</option>
-      <option value="outdoor" {% if venue_filter == 'outdoor' %}selected{% endif %}>Outdoor</option>
-      <option value="unknown" {% if venue_filter == 'unknown' %}selected{% endif %}>Unknown</option>
+      {% for vt in valid_venue_types %}
+        <option value="{{ vt }}" {% if venue_filter == vt %}selected{% endif %}>{{ vt }}</option>
+      {% endfor %}
     </select>
   </form>
 </div>

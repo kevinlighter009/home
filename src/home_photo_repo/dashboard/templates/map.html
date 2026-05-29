@@ -24,13 +24,31 @@
 
     markers.forEach(m => {
       const marker = L.marker([m.lat, m.lng]).addTo(map);
-      const placeStr = m.place_name ? `at <a href="/place/${encodeURIComponent(m.id)}#">${m.place_name}</a>` : `(${m.venue_type || 'unknown venue'})`;
-      const cuisineStr = m.cuisine ? ` (${m.cuisine})` : "";
-      marker.bindPopup(`
-        <strong>${m.dish}</strong>${cuisineStr}<br>
-        ${placeStr}<br>
-        <img src="/proxy/thumbnail/${encodeURIComponent(m.id)}" style="width: 160px; margin-top: 6px;" loading="lazy">
-      `);
+      const popup = document.createElement("div");
+      const strong = document.createElement("strong");
+      strong.textContent = m.dish;
+      popup.appendChild(strong);
+      if (m.cuisine) {
+        popup.appendChild(document.createTextNode(" (" + m.cuisine + ")"));
+      }
+      popup.appendChild(document.createElement("br"));
+      if (m.place_name) {
+        popup.appendChild(document.createTextNode("at "));
+        const a = document.createElement("a");
+        a.href = "/place/" + encodeURIComponent(m.id);
+        a.textContent = m.place_name;
+        popup.appendChild(a);
+      } else {
+        popup.appendChild(document.createTextNode("(" + (m.venue_type || "unknown venue") + ")"));
+      }
+      popup.appendChild(document.createElement("br"));
+      const img = document.createElement("img");
+      img.src = "/proxy/thumbnail/" + encodeURIComponent(m.id);
+      img.style.width = "160px";
+      img.style.marginTop = "6px";
+      img.loading = "lazy";
+      popup.appendChild(img);
+      marker.bindPopup(popup);
     });
   });
 </script>

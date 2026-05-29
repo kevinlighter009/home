@@ -58,3 +58,10 @@ def test_feed_filter_by_venue_type(client: TestClient) -> None:
     response = client.get("/feed?venue_type=home")
     assert response.status_code == 200
     assert "dish 0" not in response.text  # no photos have venue_type=home
+
+
+def test_feed_venue_dropdown_includes_all_valid_types(client: TestClient) -> None:
+    response = client.get("/feed")
+    body = response.text
+    for vt in ("home", "office", "friend_place", "restaurant", "outdoor", "other"):
+        assert f'value="{vt}"' in body
