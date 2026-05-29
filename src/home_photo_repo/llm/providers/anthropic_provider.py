@@ -19,6 +19,34 @@ from home_photo_repo.llm.providers.base import (
 
 _TOOL_NAME = "record_classification"
 
+# Anthropic vision API supports these media types; pick from magic bytes.
+_MAGIC_BYTES: tuple[tuple[bytes, str], ...] = (
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"GIF87a", "image/gif"),
+    (b"GIF89a", "image/gif"),
+    (b"RIFF", "image/webp"),  # RIFF....WEBP — only need RIFF, WebP is the only RIFF we use
+)
+
+
+def _detect_media_type(image_bytes: bytes) -> str:
+    """Return the Anthropic-compatible media type for `image_bytes`.
+
+    Anthropic validates that the declared media_type matches the actual
+    bytes (magic-byte check). Detect from the leading bytes; default to
+    image/jpeg if no signature matches (most likely path for Immich
+    thumbnails, which are JPEG by default).
+    """
+    for prefix, media_type in _MAGIC_BYTES:
+        if image_bytes.startswith(prefix):
+            # WebP needs both RIFF (offset 0) and WEBP (offset 8)
+            if media_type == "image/webp" and not (
+                len(image_bytes) >= 12 and image_bytes[8:12] == b"WEBP"
+            ):
+                continue
+            return media_type
+    return "image/jpeg"
+
 
 class AnthropicProvider:
     """VisionLLMProvider implemented against anthropic.Anthropic."""
@@ -48,12 +76,13 @@ class AnthropicProvider:
         max_tokens: int = 512,
     ) -> ProviderResult:
         image_b64 = base64.standard_b64encode(image_bytes).decode("ascii")
+        media_type = _detect_media_type(image_bytes)
         message_content: list[dict[str, Any]] = [
             {
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": "image/jpeg",
+                    "media_type": media_type,
                     "data": image_b64,
                 },
             },

@@ -114,3 +114,53 @@ def test_name_is_anthropic() -> None:
     client = FakeAnthropicClient(make_tool_use_response("x", {}))
     p = _provider(client)
     assert p.name == "anthropic"
+
+
+def test_classify_detects_png_media_type() -> None:
+    """PNG magic bytes should produce image/png in the SDK call."""
+    client = FakeAnthropicClient(make_tool_use_response("x", {"is_food": True, "confidence": 0.5}))
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"rest_of_png_doesnt_matter_for_detection"
+    _provider(client).classify(
+        image_bytes=png_bytes,
+        prompt="p",
+        response_schema={"type": "object", "properties": {}, "required": []},
+    )
+    image_block = client.calls[0]["messages"][0]["content"][0]
+    assert image_block["source"]["media_type"] == "image/png"
+
+
+def test_classify_detects_jpeg_media_type() -> None:
+    client = FakeAnthropicClient(make_tool_use_response("x", {"is_food": True, "confidence": 0.5}))
+    jpeg_bytes = b"\xff\xd8\xff\xe0" + b"jpeg_payload"
+    _provider(client).classify(
+        image_bytes=jpeg_bytes,
+        prompt="p",
+        response_schema={"type": "object", "properties": {}, "required": []},
+    )
+    image_block = client.calls[0]["messages"][0]["content"][0]
+    assert image_block["source"]["media_type"] == "image/jpeg"
+
+
+def test_classify_detects_webp_media_type() -> None:
+    client = FakeAnthropicClient(make_tool_use_response("x", {"is_food": True, "confidence": 0.5}))
+    webp_bytes = b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"webp_payload"
+    _provider(client).classify(
+        image_bytes=webp_bytes,
+        prompt="p",
+        response_schema={"type": "object", "properties": {}, "required": []},
+    )
+    image_block = client.calls[0]["messages"][0]["content"][0]
+    assert image_block["source"]["media_type"] == "image/webp"
+
+
+def test_classify_defaults_to_jpeg_for_unknown_bytes() -> None:
+    """Immich thumbnails are JPEG; unknown bytes should default to image/jpeg."""
+    client = FakeAnthropicClient(make_tool_use_response("x", {"is_food": True, "confidence": 0.5}))
+    unknown_bytes = b"\x00\x01\x02\x03" + b"not_a_known_image_format"
+    _provider(client).classify(
+        image_bytes=unknown_bytes,
+        prompt="p",
+        response_schema={"type": "object", "properties": {}, "required": []},
+    )
+    image_block = client.calls[0]["messages"][0]["content"][0]
+    assert image_block["source"]["media_type"] == "image/jpeg"
