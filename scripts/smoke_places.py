@@ -23,6 +23,8 @@ def main() -> int:
     parser.add_argument("--lat", type=float, default=_DEFAULT_LAT)
     parser.add_argument("--lng", type=float, default=_DEFAULT_LNG)
     parser.add_argument("--radius", type=int, default=150)
+    parser.add_argument("--strict", action="store_true",
+                        help="Exit non-zero if zero candidates are returned.")
     args = parser.parse_args()
 
     settings = load_settings()
@@ -47,7 +49,7 @@ def main() -> int:
         print("\nGoogle Places round-trip succeeded.")
         return 0
     print("\nNo results returned. (Try a denser urban area to verify the key.)")
-    return 0
+    return 2 if args.strict else 0
 
 
 if __name__ == "__main__":

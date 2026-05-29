@@ -12,7 +12,7 @@ Resolution order (per spec 4.3):
 
 from __future__ import annotations
 
-import contextlib
+import logging
 from typing import Protocol
 
 from home_photo_repo.places.haversine import haversine_m
@@ -121,8 +121,15 @@ class PlaceMatcher:
             # Preserve raw Google types for debugging / future re-mapping.
             notes=",".join(chosen.types) if chosen.types else None,
         )
-        with contextlib.suppress(Exception):
+        try:
             self._repo.insert(cached)
+        except Exception:  # noqa: BLE001
+            # Cache write failure must not fail the match (likely a unique
+            # constraint race between two concurrent matchers). Log and move on.
+            logging.getLogger(__name__).warning(
+                "failed to cache gplaces row id=%s name=%s",
+                cached.id, cached.name, exc_info=True,
+            )
 
         ambiguous = False
         if len(ranked) > 1:
