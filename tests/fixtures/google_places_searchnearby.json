@@ -1,0 +1,30 @@
+{
+  "places": [
+    {
+      "id": "ChIJrTLr-GyuEmsRBfy61i59si0",
+      "displayName": {
+        "text": "Mimi's Trattoria",
+        "languageCode": "en"
+      },
+      "formattedAddress": "123 Castro St, San Francisco, CA 94114, USA",
+      "types": ["restaurant", "italian_restaurant", "food", "point_of_interest", "establishment"],
+      "location": {
+        "latitude": 37.7619,
+        "longitude": -122.4341
+      }
+    },
+    {
+      "id": "ChIJxxxxxxxxxxxxxxxxxxxxxx",
+      "displayName": {
+        "text": "Joe's Diner",
+        "languageCode": "en"
+      },
+      "formattedAddress": "456 Castro St, San Francisco, CA 94114, USA",
+      "types": ["restaurant", "diner", "food", "point_of_interest"],
+      "location": {
+        "latitude": 37.7620,
+        "longitude": -122.4342
+      }
+    }
+  ]
+}
