@@ -71,3 +71,24 @@ logs:
 
 backup-now:
 	scripts/backup_postgres.sh
+
+bootstrap-existing:
+	uv venv
+	uv sync --all-extras
+	@if [ ! -f .env ]; then \
+		echo "ERROR: .env missing. Create it from .env.example first."; \
+		exit 1; \
+	fi
+	@chmod 600 .env
+	@if grep -qE '^(IMMICH_API_KEY|ANTHROPIC_API_KEY)=replace_me' .env; then \
+		echo "ERROR: .env still contains 'replace_me' placeholder secrets."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/db/app.sqlite" ]; then \
+		echo "ERROR: app.sqlite not found at $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/db/app.sqlite"; \
+		echo "       Use 'make bootstrap' on a fresh setup; 'bootstrap-existing' is for migrating to a new Mac with an already-populated SSD."; \
+		exit 1; \
+	fi
+	mkdir -p $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/logs
+	$(PYTHON) -m home_photo_repo.db migrate
+	@echo "bootstrap-existing complete — DB is present, deps installed, migrations applied."
