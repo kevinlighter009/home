@@ -163,3 +163,30 @@ def test_run_once_with_providers_invokes_stage_a(tmp_path: Path) -> None:
     assert stage_b.calls == 0  # not food
     row = conn.execute("SELECT stage_a_is_food FROM photo_analysis").fetchone()
     assert row["stage_a_is_food"] == 0
+
+
+def test_run_once_per_asset_failure_does_not_halt_other_assets(tmp_path: Path) -> None:
+    """If process_asset raises on asset N, the worker still processes N+1, N+2..."""
+    from unittest.mock import patch
+
+    conn = _conn(tmp_path)
+    assets = [_asset(f"a{i}", i + 1) for i in range(3)]
+    fake = FakeImmich(batches=[assets, []])
+    fixed_now = datetime(2026, 5, 28, 13, 0, 0, tzinfo=UTC)
+
+    seen_ids: list[str] = []
+
+    def flaky_process_asset(conn_, asset_, **kw):  # noqa: ANN
+        seen_ids.append(asset_.id)
+        if asset_.id == "a1":
+            raise RuntimeError("simulated per-asset failure")
+        from home_photo_repo.worker.pipeline import process_asset
+        return process_asset(conn_, asset_, **kw)
+
+    with patch("home_photo_repo.worker.main.process_asset", side_effect=flaky_process_asset):
+        summary = run_once(conn, fake, batch_size=10, now=fixed_now)
+
+    # All 3 assets attempted (not just up to the failure)
+    assert seen_ids == ["a0", "a1", "a2"]
+    assert summary.assets_seen == 3
+    assert summary.errors == 1

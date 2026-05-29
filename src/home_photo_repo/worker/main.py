@@ -115,18 +115,20 @@ def run_once(
                     summary.errors += 1
                     summary.last_error = f"{asset.id}: {e!r}"
                     log.exception("pipeline failed on asset %s", asset.id)
-                    # Do NOT advance the cursor past a failed asset.
-                    break
-                else:
-                    if result is not ProcessResult.DEFERRED_NOT_READY:
-                        summary.assets_processed += 1
+                    # Advance cursor past the failed asset so the rest of
+                    # the batch still gets processed. The asset's row (if
+                    # inserted) carries last_error / review_status='needs_review'
+                    # from the pipeline's error helpers, so the user can
+                    # re-process it from the dashboard.
                     write_cursor(conn, asset.updated_at, last_id=asset.id)
-            else:
-                # whole batch processed without break
-                if len(assets) < batch_size:
-                    break
-                continue
-            break  # broke out of for-loop due to per-asset failure
+                    continue
+                if result is not ProcessResult.DEFERRED_NOT_READY:
+                    summary.assets_processed += 1
+                write_cursor(conn, asset.updated_at, last_id=asset.id)
+            # The for-loop now always completes naturally. Continue the
+            # outer while based on batch fullness.
+            if len(assets) < batch_size:
+                break
     finally:
         _finish_run(conn, run_id, summary)
     return summary
