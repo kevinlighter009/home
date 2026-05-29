@@ -51,16 +51,21 @@ MLX_BASE_URL=http://127.0.0.1:8081/v1
 ### 6.1 Install MLX runtime
 
 ```bash
-cd /Users/kailiang-mac-deeproute/Documents/code/llm_project/home
-make install-mlx
+cd /Users/kailiangchen/Documents/code/home
+uv sync --extra mlx
 ```
-Expected: `mlx-vlm` installed; Qwen2.5-VL-7B-Instruct-4bit (~5 GB) downloaded to `~/.cache/huggingface`.
+Expected: `mlx-vlm` installed in the project venv.
+
+> Note: `make install-mlx` also tries to install the launchd `com.homephoto.mlx` service, which fails (EIO) when `$SSD_DATA_DIR/logs` doesn't exist. Since launchd is skipped (Plan 5), we install deps only and run MLX in the foreground. Cleanup any leftover plist with `rm -f ~/Library/LaunchAgents/com.homephoto.mlx.plist`.
 
 ### 6.2 Smoke test
 
-Terminal A:
+Terminal A (foreground MLX server — first run downloads ~5 GB):
 ```bash
-make serve-mlx          # binds 127.0.0.1:8081
+cd /Users/kailiangchen/Documents/code/home
+uv run --with mlx-vlm python -m mlx_vlm.server \
+  --model mlx-community/Qwen2.5-VL-7B-Instruct-4bit \
+  --port 8081
 ```
 Terminal B:
 ```bash
@@ -156,7 +161,9 @@ Expected: all green.
 
 Terminal A:
 ```bash
-make serve-mlx
+cd /Users/kailiangchen/Documents/code/home
+uv run --with mlx-vlm python -m mlx_vlm.server \
+  --model mlx-community/Qwen2.5-VL-7B-Instruct-4bit --port 8081
 ```
 Terminal B:
 ```bash
@@ -192,7 +199,10 @@ Expected: ProviderError surfaces immediately, asset failed/skipped, no loop. Res
 ### 8.5 Recovery — restart MLX
 
 ```bash
-make serve-mlx
+# Terminal A — restart MLX foreground server
+uv run --with mlx-vlm python -m mlx_vlm.server \
+  --model mlx-community/Qwen2.5-VL-7B-Instruct-4bit --port 8081
+# Terminal B
 uv run python -m home_photo_repo.worker --once
 ```
 Expected: subsequent rows return to `provider=mlx` (per-call fallback, no sticky state).
@@ -229,9 +239,9 @@ Expected: `{"status":"ok"}`; recent classifications render with provider column 
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `MLX server at … unreachable` at every startup | `make serve-mlx` not running | Start it, or switch providers to `anthropic` |
+| `MLX server at … unreachable` at every startup | foreground `mlx_vlm.server` not running | Start it (see Plan 6.2), or switch providers to `anthropic` |
 | Fallback never fires when MLX is down | `LLM_FALLBACK_PROVIDER=""` (strict mode) | Set to `anthropic` |
-| Every call goes to Anthropic with MLX up | MLX returning 5xx | Check `make serve-mlx` logs; restart |
+| Every call goes to Anthropic with MLX up | MLX returning 5xx | Check the `mlx_vlm.server` terminal logs; restart |
 | `place_match_source=null` on Home photos | EXIF GPS missing or radius too tight | Verify EXIF; widen curated radius |
 | `sqlite3 … database is locked` | Worker + dashboard + manual query racing | Close one — WAL serializes writers |
 | `psycopg.OperationalError` from worker | Immich Postgres down | `cd /Users/kailiangchen/Documents/immich && docker compose up -d` |
