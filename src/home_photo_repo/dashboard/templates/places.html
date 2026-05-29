@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Places — home_photo_repo{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Add place</h2>
+  <form method="post" action="/places/add">
+    <div class="row">
+      <input name="name" placeholder="Name (e.g. Home)" required style="flex: 2;" />
+      <select name="type" required>
+        {% for t in valid_types %}
+          <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="row">
+      <input name="lat" type="number" step="any" placeholder="Latitude" required style="flex: 1;" />
+      <input name="lng" type="number" step="any" placeholder="Longitude" required style="flex: 1;" />
+      <input name="radius" type="number" value="50" min="5" max="500" style="width: 80px;" />
+      <button type="submit">Add</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin: 0 0 12px;">All places ({{ places|length }})</h2>
+  <table>
+    <thead>
+      <tr><th>Type</th><th>Name</th><th>Lat</th><th>Lng</th><th>Radius</th><th>ID</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for p in places %}
+        <tr>
+          <td>{{ p.type }}</td>
+          <td>{{ p.name }}</td>
+          <td>{{ "%.5f" % p.latitude }}</td>
+          <td>{{ "%.5f" % p.longitude }}</td>
+          <td>{{ p.radius_m }}m</td>
+          <td style="font-family: monospace; font-size: 11px; color: var(--muted);">{{ p.id }}</td>
+          <td>
+            {% if p.is_curated %}
+              <form method="post" action="/places/delete" style="display: inline;"
+                    onsubmit="return confirm('Delete {{ p.name }}?')">
+                <input type="hidden" name="id" value="{{ p.id }}" />
+                <button class="danger" type="submit">Delete</button>
+              </form>
+            {% else %}
+              <span style="color: var(--muted); font-size: 11px;">(cached)</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" style="color: var(--muted);">No places yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
