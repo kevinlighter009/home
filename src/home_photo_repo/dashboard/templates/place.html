@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ place.name }} — home_photo_repo{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin: 0 0 4px;">{{ place.name }}</h2>
+  <div style="color: var(--muted); font-size: 13px;">
+    {{ place.type }} ·
+    {{ "%.5f" % place.latitude }}, {{ "%.5f" % place.longitude }} ·
+    {{ photos|length }} dishes recorded
+  </div>
+  {% if place.address %}
+    <div style="color: var(--muted); font-size: 13px; margin-top: 4px;">{{ place.address }}</div>
+  {% endif %}
+</div>
+
+<div class="grid">
+  {% for p in photos %}
+    <div class="photo-card">
+      <img src="/proxy/thumbnail/{{ p.immich_asset_id }}?size=thumbnail" alt="{{ p.dish_name }}" loading="lazy" />
+      <div class="meta">
+        <div class="dish">{{ p.dish_name }}</div>
+        <div class="venue">{{ p.cuisine }}{% if p.taken_at %} · {{ p.taken_at[:10] }}{% endif %}</div>
+        {% if p.review_status == 'needs_review' %}
+          <span class="badge warn">needs review</span>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="card" style="grid-column: 1 / -1;">No dishes recorded here yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}
