@@ -76,7 +76,7 @@ Expected: HTTP 200 from `/v1/chat/completions`; response describes the test imag
 ### 6.3 Stage A + Stage B via MLX only (strict)
 
 ```bash
-LLM_FALLBACK_PROVIDER="" uv run python -m home_photo_repo.worker --once
+LLM_FALLBACK_PROVIDER="" uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 sqlite3 /Users/kailiangchen/Documents/app/db/app.sqlite \
   "SELECT is_food, dish_label, stage_a_provider, stage_b_provider, \
           stage_a_prompt_version, stage_b_prompt_version \
@@ -87,7 +87,7 @@ Expected: rows with `stage_a_provider=mlx`, `stage_b_provider=mlx`, non-null pro
 ### 6.4 Performance sanity
 
 ```bash
-time uv run python -m home_photo_repo.worker --once --limit 5
+time uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 ```
 Expected: < ~6 s per photo on M-series Mac for 7B-4bit. Note baseline.
 
@@ -112,7 +112,7 @@ Covered by 6.3 — confirm both `stage_a_prompt_version` and `stage_b_prompt_ver
 ```bash
 sqlite3 /Users/kailiangchen/Documents/app/db/app.sqlite \
   "INSERT INTO photo_analysis (asset_id, status) VALUES ('does-not-exist', 'pending');"
-uv run python -m home_photo_repo.worker --once
+uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 ```
 Expected: worker logs error for the bad row, continues, exits 0.
 
@@ -134,7 +134,7 @@ Expected: 422 with validation error (`accept|reject|edit` only).
 
 Import or take a photo within 60 m of `37.3554521256761, -122.0331533193141`, then:
 ```bash
-uv run python -m home_photo_repo.worker --once
+uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 sqlite3 /Users/kailiangchen/Documents/app/db/app.sqlite \
   "SELECT place_match_source, place_id, place_name FROM photo_analysis \
    ORDER BY venue_resolved_at DESC LIMIT 1;"
@@ -167,7 +167,7 @@ uv run --with mlx-vlm python -m mlx_vlm.server \
 ```
 Terminal B:
 ```bash
-uv run python -m home_photo_repo.worker --once
+uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 ```
 Expected:
 - `MLX server reachable at http://127.0.0.1:8081/v1`
@@ -178,7 +178,7 @@ Expected:
 
 Stop MLX (Ctrl-C in Terminal A), then:
 ```bash
-uv run python -m home_photo_repo.worker --once
+uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 sqlite3 /Users/kailiangchen/Documents/app/db/app.sqlite \
   "SELECT asset_id, stage_a_provider, stage_b_provider FROM photo_analysis \
    ORDER BY created_at DESC LIMIT 3;"
@@ -192,7 +192,7 @@ Expected:
 
 Temporarily set `ANTHROPIC_API_KEY=sk-ant-BROKEN` in `.env` with MLX down:
 ```bash
-uv run python -m home_photo_repo.worker --once
+uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 ```
 Expected: ProviderError surfaces immediately, asset failed/skipped, no loop. Restore the real key.
 
@@ -203,7 +203,7 @@ Expected: ProviderError surfaces immediately, asset failed/skipped, no loop. Res
 uv run --with mlx-vlm python -m mlx_vlm.server \
   --model mlx-community/Qwen2.5-VL-7B-Instruct-4bit --port 8081
 # Terminal B
-uv run python -m home_photo_repo.worker --once
+uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 ```
 Expected: subsequent rows return to `provider=mlx` (per-call fallback, no sticky state).
 
