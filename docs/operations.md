@@ -177,6 +177,40 @@ a vision model running on your Mac via [mlx-vlm](https://github.com/Blaizzy/mlx-
 The architecture supports per-stage provider selection — you can keep
 Anthropic for one stage and MLX for the other, or use MLX for both.
 
+### Automatic fallback (default behavior)
+
+The default configuration sets MLX as primary AND configures Anthropic as
+the per-call fallback (`LLM_FALLBACK_PROVIDER=anthropic` in `.env.example`).
+What this means in practice:
+
+- **MLX server up + reachable** → all classification happens locally.
+- **MLX server down / not installed / model not yet downloaded** → the
+  worker's `classify()` raises a transient error, the FallbackProvider
+  catches it, and Anthropic handles the call. No data loss, no
+  needs_review flag — just a `log.warning` line and per-call slowness.
+
+This means a fresh install with both an `ANTHROPIC_API_KEY` and an MLX
+server set up will use local inference by default. If you haven't run
+`make install-mlx` yet, fallback to Anthropic is automatic; the worker
+keeps running.
+
+To **disable** fallback (strict mode — fail loudly if primary is down):
+
+```dotenv
+LLM_FALLBACK_PROVIDER=
+```
+
+To **use only Anthropic** (no MLX at all):
+
+```dotenv
+LLM_STAGE_A_PROVIDER=anthropic
+LLM_STAGE_B_PROVIDER=anthropic
+LLM_FALLBACK_PROVIDER=
+```
+
+The worker's startup log line will show the active chain, e.g.
+`stage_a=mlx→anthropic` (fallback configured) vs `stage_a=mlx` (strict).
+
 ### Requirements
 
 - Apple Silicon (M1 or newer)

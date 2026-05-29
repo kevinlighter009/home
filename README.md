@@ -119,51 +119,51 @@ covered by `respx`-mocked tests for the Immich client.
 
 ## LLM provider options
 
-Two providers ship out of the box:
+The default configuration uses **MLX (local) as primary with Anthropic
+(API) as automatic fallback**. If the MLX server is up and reachable,
+classification is fully local at zero per-call cost. If MLX is down or
+not yet installed, individual classification calls transparently fall
+back to Anthropic — no manual intervention, no data loss.
 
-### Provider A: Anthropic Claude (default)
+### Quick paths
 
-`make smoke-llm` verifies your `ANTHROPIC_API_KEY`. Cost: ~$10/year at
-typical family use. No local resources required.
-
-### Provider B: Local MLX (Apple Silicon)
-
-Run everything offline on your Mac. Default model
-(`Qwen2.5-VL-7B-Instruct-4bit`) uses ~5 GB RAM and works well on any
-16+ GB Apple Silicon Mac.
+**Local-first (recommended, default):** Install MLX and you're done.
 
 ```bash
-make install-mlx    # installs mlx-vlm + launchd service
+make install-mlx        # mlx-vlm + launchd service
 ```
 
-Then enable in `.env`:
+Set `ANTHROPIC_API_KEY` in `.env` even if you only want local — it's the
+fallback when MLX is briefly unreachable. ~$0/yr at typical usage if MLX
+is always up.
+
+**Anthropic-only:** Don't install MLX. Edit `.env`:
 
 ```dotenv
-LLM_STAGE_A_PROVIDER=mlx
-LLM_STAGE_B_PROVIDER=mlx
+LLM_STAGE_A_PROVIDER=anthropic
+LLM_STAGE_B_PROVIDER=anthropic
+LLM_FALLBACK_PROVIDER=
 ```
 
-Verify:
+~$10/yr at typical family use.
 
-```bash
-make smoke-mlx
+**MLX-only (strict, no fallback):** Install MLX. Edit `.env`:
+
+```dotenv
+LLM_FALLBACK_PROVIDER=
 ```
+
+If MLX is down, classification errors and the asset goes to `needs_review`.
+
+### Verifying
+
+- `make smoke-llm` — verifies `ANTHROPIC_API_KEY` round-trip
+- `make smoke-mlx` — verifies local MLX server
+- Worker startup log shows the active chain, e.g.
+  `stage_a=mlx→anthropic stage_b=mlx→anthropic`
 
 See [`docs/operations.md` § Provider option B](docs/operations.md#provider-option-b-local-mlx-apple-silicon)
-for model alternatives, mixing providers per stage, and troubleshooting.
-
-### Mixing providers
-
-Each stage's provider is independent:
-
-```dotenv
-LLM_STAGE_A_PROVIDER=mlx        # fast local is-food check
-LLM_STAGE_B_PROVIDER=anthropic  # higher-quality dish identification
-```
-
-This pattern uses MLX for the high-volume Stage A (every photo) and
-Anthropic for the lower-volume Stage B (only food photos) — minimizing
-both latency and API spend.
+for model choices, multi-port setups, troubleshooting.
 
 ### Verifying the LLM pipeline
 
@@ -369,3 +369,6 @@ src/home_photo_repo/
 - **Plan 7** ✅ Done — Local MLX vision pipeline as a first-class
   alternative to the Anthropic API. One-command install
   (`make install-mlx`), default model `Qwen2.5-VL-7B-Instruct-4bit`.
+- **Plan 8** ✅ Done — MLX-default with Anthropic auto-fallback.
+  Local-first classification when MLX is reachable; transparent fallback
+  per-call when not.
