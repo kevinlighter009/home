@@ -1,0 +1,14 @@
+# Runtime dependencies for home_photo_repo.
+# Mirrors `[project].dependencies` in pyproject.toml.
+#
+# Install (conda / pip):
+#   conda create -n home_photo_repo python=3.12
+#   conda activate home_photo_repo
+#   pip install -r requirements.txt
+#
+# Or with uv (recommended — matches the project's primary tooling):
+#   uv sync
+httpx>=0.27
+pydantic>=2.7
+pydantic-settings>=2.3
+anthropic>=0.40

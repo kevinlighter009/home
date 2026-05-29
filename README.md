@@ -16,8 +16,9 @@ and `docs/plans/` for per-phase implementation plans.
 ## Prerequisites
 
 - macOS with Apple Silicon recommended (Intel works for Plan 1)
+- Python 3.12+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [`uv`](https://github.com/astral-sh/uv) for Python dep management
+- Either [`uv`](https://github.com/astral-sh/uv) (recommended) **or** conda/pip
 - An external SSD (APFS-formatted) for production; for dev you can use a
   local path
 
@@ -42,14 +43,38 @@ chmod 600 .env
 # edit IMMICH_BASE_URL, IMMICH_API_KEY, SSD_DATA_DIR
 ```
 
-### 3. Bootstrap
+### 3. Install dependencies
 
+**Option A — `uv` (recommended, fastest):**
 ```bash
 make bootstrap
 ```
+Creates `.venv`, installs deps via `uv sync --all-extras`, creates data
+directories, applies database migrations.
 
-This creates the virtualenv, installs deps, creates the data directories,
-and applies database migrations.
+**Option B — conda + pip:**
+```bash
+conda create -n home_photo_repo python=3.12
+conda activate home_photo_repo
+pip install -r requirements.txt -r requirements-dev.txt
+pip install -e .                          # install the project itself
+mkdir -p $SSD_DATA_DIR/{db,logs}          # or default ~/home_photo_repo_data/{db,logs}
+python -m home_photo_repo.db migrate      # apply DB migrations
+```
+
+**Option C — plain pip + venv:**
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pip install -e .
+mkdir -p $SSD_DATA_DIR/{db,logs}
+python -m home_photo_repo.db migrate
+```
+
+For options B and C the Makefile targets that begin with `uv run …` won't
+work; substitute plain `python` / `pytest` / `ruff` / `mypy` instead (the
+venv must be activated).
 
 ### 4. Verify
 
