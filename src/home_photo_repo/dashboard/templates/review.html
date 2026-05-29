@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Review — home_photo_repo{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin: 0;">Review queue ({{ rows|length }})</h2>
+  <p style="color: var(--muted); margin: 6px 0 0;">
+    Photos with low classifier confidence, ambiguous venue matches, or missing GPS.
+    Confirm to accept the current values; correct to override and mark as manually classified.
+  </p>
+</div>
+
+{% for row in rows %}
+  {% include "_review_row.html" %}
+{% else %}
+  <div class="card">Nothing to review. 🎉</div>
+{% endfor %}
+{% endblock %}

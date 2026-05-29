@@ -1,0 +1,41 @@
+<div class="card" id="review-{{ row.immich_asset_id }}" style="display: grid; grid-template-columns: 200px 1fr; gap: 16px;">
+  <img src="/proxy/thumbnail/{{ row.immich_asset_id }}?size=preview" alt="" loading="lazy"
+       style="width: 100%; border-radius: 6px;" />
+  <div>
+    {% if after_submit %}
+      <div style="color: var(--ok); font-weight: 600; margin-bottom: 8px;">
+        ✓ {{ row.review_status }} — {{ row.dish_name or '(no dish)' }}{% if row.place_name %} @ {{ row.place_name }}{% endif %}
+      </div>
+    {% else %}
+      <div style="color: var(--muted); font-size: 12px;">
+        {% if row.taken_at %}{{ row.taken_at[:10] }}{% endif %}
+        {% if row.stage_b_confidence is not none %}
+          · stage_b confidence: {{ "%.2f" % row.stage_b_confidence }}
+        {% endif %}
+        {% if row.last_error %} · {{ row.last_error }}{% endif %}
+        {% if row.review_notes %} · {{ row.review_notes }}{% endif %}
+      </div>
+      <form hx-post="/review/{{ row.immich_asset_id }}"
+            hx-target="#review-{{ row.immich_asset_id }}"
+            hx-swap="outerHTML"
+            style="margin-top: 12px;">
+        <div class="row">
+          <input name="dish_name" value="{{ row.dish_name or '' }}" placeholder="dish name" style="flex: 1;" />
+          <input name="cuisine" value="{{ row.cuisine or '' }}" placeholder="cuisine" style="flex: 1;" />
+        </div>
+        <div class="row">
+          <select name="place_id" style="flex: 1;">
+            <option value="">— pick a place —</option>
+            {% for pl in places %}
+              <option value="{{ pl.id }}" {% if pl.id == row.place_id %}selected{% endif %}>
+                {{ pl.type }}: {{ pl.name }}
+              </option>
+            {% endfor %}
+          </select>
+          <button name="decision" value="confirm" type="submit">Confirm</button>
+          <button name="decision" value="correct" type="submit">Correct</button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</div>
