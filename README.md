@@ -117,26 +117,53 @@ make format       # ruff format
 All tests are offline (`pytest-socket` blocks sockets). HTTP behavior is
 covered by `respx`-mocked tests for the Immich client.
 
-## LLM provider selection
+## LLM provider options
 
-By default, both stages use Anthropic Claude (`claude-haiku-4-5` for Stage A,
-`claude-sonnet-4-5` for Stage B). To switch a stage to a local MLX-served
-model, set in `.env`:
+Two providers ship out of the box:
+
+### Provider A: Anthropic Claude (default)
+
+`make smoke-llm` verifies your `ANTHROPIC_API_KEY`. Cost: ~$10/year at
+typical family use. No local resources required.
+
+### Provider B: Local MLX (Apple Silicon)
+
+Run everything offline on your Mac. Default model
+(`Qwen2.5-VL-7B-Instruct-4bit`) uses ~5 GB RAM and works well on any
+16+ GB Apple Silicon Mac.
+
+```bash
+make install-mlx    # installs mlx-vlm + launchd service
+```
+
+Then enable in `.env`:
 
 ```dotenv
 LLM_STAGE_A_PROVIDER=mlx
-MLX_STAGE_A_MODEL=mlx-community/Qwen2-VL-2B-Instruct-4bit
+LLM_STAGE_B_PROVIDER=mlx
 ```
 
-You also need an MLX server running locally on `http://localhost:8081/v1` —
-the easiest path is:
+Verify:
 
 ```bash
-pip install mlx-vlm
-mlx_vlm.server --model mlx-community/Qwen2-VL-2B-Instruct-4bit --port 8081
+make smoke-mlx
 ```
 
-The MLX server is **optional** and not installed by `make bootstrap`.
+See [`docs/operations.md` § Provider option B](docs/operations.md#provider-option-b-local-mlx-apple-silicon)
+for model alternatives, mixing providers per stage, and troubleshooting.
+
+### Mixing providers
+
+Each stage's provider is independent:
+
+```dotenv
+LLM_STAGE_A_PROVIDER=mlx        # fast local is-food check
+LLM_STAGE_B_PROVIDER=anthropic  # higher-quality dish identification
+```
+
+This pattern uses MLX for the high-volume Stage A (every photo) and
+Anthropic for the lower-volume Stage B (only food photos) — minimizing
+both latency and API spend.
 
 ### Verifying the LLM pipeline
 

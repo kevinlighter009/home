@@ -1,7 +1,7 @@
 # Operations Guide
 
 Day-2 operations for `home_photo_repo`: launchd auto-start, backups,
-migration to a new Mac, optional MLX setup, and troubleshooting.
+migration to a new Mac, local MLX provider setup, and troubleshooting.
 
 ## Install auto-start (launchd)
 
@@ -22,11 +22,8 @@ This installs three services:
 | `com.homephoto.backup` | daily at 03:00 | `backup.log`, `backup.err.log` |
 
 The MLX plist (`com.homephoto.mlx`) is optional and not installed by default.
-To opt in:
-
-```bash
-uv run python -m launchd.install_launchd mlx
-```
+See [Provider option B: Local MLX](#provider-option-b-local-mlx-apple-silicon)
+below for the one-command opt-in (`make install-mlx`).
 
 ### Verify services are running
 
@@ -172,62 +169,130 @@ Wall-clock: ~30–60 min depending on Docker image download speed.
 
 ---
 
-## Optional: MLX vision server
+## Provider option B: Local MLX (Apple Silicon)
 
-If you want a local fallback for Stage A and/or Stage B (zero per-call
-API cost), enable MLX:
+The default pipeline uses Anthropic's Claude API. If you'd rather run
+everything locally (zero per-call cost, full offline operation), swap in
+a vision model running on your Mac via [mlx-vlm](https://github.com/Blaizzy/mlx-vlm).
+The architecture supports per-stage provider selection — you can keep
+Anthropic for one stage and MLX for the other, or use MLX for both.
 
-### Install mlx-vlm
+### Requirements
 
-```bash
-uv add mlx-vlm  # or pip install mlx-vlm
-```
+- Apple Silicon (M1 or newer)
+- ≥16 GB unified memory (the default model needs ~5 GB; comfortable on 16 GB+; recommended ≥24 GB)
+- ~10 GB free disk for model + cache
 
-### Smoke test the server manually
-
-```bash
-uv run mlx_vlm.server --model mlx-community/Qwen2-VL-2B-Instruct-4bit --port 8081
-```
-
-(In another terminal, verify with `curl http://localhost:8081/v1/models`.)
-
-### Install the MLX launchd service
+### Quick install
 
 ```bash
-uv run python -m launchd.install_launchd mlx
+make install-mlx
 ```
 
-> **Note:** the MLX plist template hardcodes the model name
-> `mlx-community/Qwen2-VL-2B-Instruct-4bit`. To switch models, edit
-> `launchd/com.homephoto.mlx.plist.template`, then re-run
-> `uv run python -m launchd.install_launchd mlx`.
+This:
+1. Installs `mlx-vlm` via the `mlx` extras group.
+2. Installs the `com.homephoto.mlx` launchd service (auto-starts at login).
+3. Prints next-step instructions.
 
-### Switch the pipeline to MLX
-
-Edit `.env`:
+Then enable MLX for one or both stages by editing `.env`:
 
 ```dotenv
-LLM_STAGE_A_PROVIDER=mlx
-# Or both stages:
-LLM_STAGE_B_PROVIDER=mlx
+LLM_STAGE_A_PROVIDER=mlx     # use MLX for is-food check
+LLM_STAGE_B_PROVIDER=mlx     # use MLX for dish + cuisine
 ```
 
-Restart the worker:
+Then verify and restart the worker:
 
 ```bash
+make smoke-mlx                                       # round-trip a synthetic image
 launchctl bootout gui/$UID/com.homephoto.worker
 launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.homephoto.worker.plist
 ```
 
-The worker startup log should now print `stage_a=mlx` or `stage_b=mlx`.
+The worker's startup log line will now print `stage_a=mlx` (or `stage_b=mlx`).
 
-To revert: change `.env` back to `anthropic` and restart the worker.
+### Choosing a model
 
-### Uninstall MLX
+The MLX server hosts ONE model at a time. Stage A and Stage B both target
+that single model unless you run two MLX servers on different ports (advanced).
+
+| Use case | Model | RAM | Speed | Notes |
+|---|---|---|---|---|
+| **Default (balanced)** | `mlx-community/Qwen2.5-VL-7B-Instruct-4bit` | ~5 GB | Fast | What `make install-mlx` installs |
+| Lighter (16 GB Mac, prefer speed) | `mlx-community/Qwen2-VL-2B-Instruct-4bit` | ~1.5 GB | Fastest | Lower quality |
+| Better quality, slightly more RAM | `mlx-community/Qwen2.5-VL-7B-Instruct-6bit` | ~6 GB | Slightly slower than 4-bit | ~10% RAM overhead |
+| High quality (64 GB+ Mac) | `mlx-community/Qwen2.5-VL-32B-Instruct-4bit` | ~18 GB | Slower | Production-grade vision |
+
+To change the model:
+
+1. Edit `launchd/com.homephoto.mlx.plist.template` — change the `--model` value.
+2. Edit `.env` — set `MLX_STAGE_A_MODEL` and `MLX_STAGE_B_MODEL` to the SAME new value.
+3. Re-install:
+
+   ```bash
+   uv run python -m launchd.install_launchd mlx
+   ```
+
+The first invocation after a model change triggers a one-time download
+(~3–20 GB depending on model). Subsequent boots are instant.
+
+### Different models per stage (advanced)
+
+If you want a fast small model for Stage A and a heavier model for
+Stage B, you need to run two MLX servers on two ports:
+
+1. Add a second port (e.g., `8082`) and a second plist
+   (`launchd/com.homephoto.mlx-b.plist.template`).
+2. Adjust `MLX_BASE_URL_STAGE_A` / `MLX_BASE_URL_STAGE_B` — but note that
+   the current code uses a single `MLX_BASE_URL`. You'd need to extend
+   `Settings` and `build_provider` to accept two URLs. This is a real
+   change, not just config.
+
+For most users, the single-model default delivers good results without
+the operational complexity.
+
+### Reverting to Anthropic
 
 ```bash
+# In .env:
+LLM_STAGE_A_PROVIDER=anthropic
+LLM_STAGE_B_PROVIDER=anthropic
+
+# Optionally uninstall the MLX launchd service:
 uv run python -m launchd.uninstall_launchd mlx
+
+# Restart the worker:
+launchctl bootout gui/$UID/com.homephoto.worker
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.homephoto.worker.plist
 ```
+
+### Verifying the local pipeline
+
+After enabling MLX:
+
+```bash
+make smoke-mlx       # round-trip a synthetic image through Stage A
+```
+
+Then take a food photo with your iPhone. Within one poll cycle, the
+worker should classify it without making any external API calls — you
+can verify with Activity Monitor (no Anthropic-bound network traffic
+during processing).
+
+### Troubleshooting
+
+- **`make smoke-mlx` says "server not reachable"** — the launchd service
+  may still be starting. First-run loads the model from disk; that can
+  take 10–30 s. Wait, then re-try. Check
+  `tail ~/Library/Logs/home_photo_repo/mlx.err.log` for errors.
+- **Model download stalls** — `mlx-vlm` downloads from Hugging Face on
+  first run. If you're behind a corporate proxy, set `HF_ENDPOINT` or
+  use `huggingface-cli login` first.
+- **High thermal throttling** — the 32B model can heat a MacBook
+  noticeably under sustained load. Use 7B unless you have an iMac or
+  Mac Studio with active cooling.
+- **`mlx-vlm` install fails on Intel Mac** — Intel is not supported.
+  Stay on the Anthropic provider.
 
 ---
 
