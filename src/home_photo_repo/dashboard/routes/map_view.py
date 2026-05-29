@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 from typing import Any, cast
 
@@ -15,9 +14,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 def map_view(request: Request) -> HTMLResponse:
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         rows = conn.execute(
             """
             SELECT p.immich_asset_id, p.latitude, p.longitude,
@@ -32,9 +29,6 @@ def map_view(request: Request) -> HTMLResponse:
              LIMIT 5000
             """
         ).fetchall()
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
 
     markers: list[dict[str, Any]] = [
         {

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from typing import cast
 
 from fastapi import APIRouter, Request
@@ -29,9 +28,7 @@ def feed(
         params.append(venue_type)
     where_sql = " AND ".join(where)
 
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         total = conn.execute(
             f"SELECT COUNT(*) FROM photo_analysis WHERE {where_sql}",  # noqa: S608
             tuple(params),
@@ -47,9 +44,6 @@ def feed(
             """,  # noqa: S608
             (*params, _PAGE_SIZE, offset),
         ).fetchall()
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
 
     templates = request.app.state.templates
     return cast(

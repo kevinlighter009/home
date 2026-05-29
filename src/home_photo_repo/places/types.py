@@ -44,4 +44,9 @@ class MatchResult:
     notes: str | None = None
 
 
-__all__ = ["CuratedPlace", "MatchResult", "NearbyPlace"]
+VALID_VENUE_TYPES: tuple[str, ...] = (
+    "home", "office", "friend_place", "restaurant", "outdoor", "other",
+)
+
+
+__all__ = ["CuratedPlace", "MatchResult", "NearbyPlace", "VALID_VENUE_TYPES"]

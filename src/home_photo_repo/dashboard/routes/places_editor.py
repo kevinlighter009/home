@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import uuid
 from typing import cast
 
@@ -10,23 +9,17 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from home_photo_repo.places.repository import PlacesRepository
+from home_photo_repo.places.types import VALID_VENUE_TYPES as _VALID_TYPES
 from home_photo_repo.places.types import CuratedPlace
 
 router = APIRouter()
-
-_VALID_TYPES = ("home", "office", "friend_place", "restaurant", "outdoor", "other")
 
 
 @router.get("/places", response_class=HTMLResponse)
 def places_list(request: Request) -> HTMLResponse:
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         places = PlacesRepository(conn).list_all()
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
 
     templates = request.app.state.templates
     return cast(
@@ -64,9 +57,7 @@ def places_add(
     if type not in _VALID_TYPES:
         return RedirectResponse(url="/places?error=invalid_type", status_code=303)
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         PlacesRepository(conn).insert(
             CuratedPlace(
                 id=f"curated:{uuid.uuid4()}",
@@ -75,9 +66,6 @@ def places_add(
                 notes=notes or None,
             )
         )
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
     return RedirectResponse(url="/places", status_code=303)
 
 
@@ -87,11 +75,6 @@ def places_delete(
     id: str = Form(...),  # noqa: A002
 ) -> RedirectResponse:
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         PlacesRepository(conn).delete_by_id(id)
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
     return RedirectResponse(url="/places", status_code=303)

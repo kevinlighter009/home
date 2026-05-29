@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from datetime import UTC, datetime
 from typing import cast
 
@@ -15,9 +14,7 @@ router = APIRouter()
 @router.get("/review", response_class=HTMLResponse)
 def review_list(request: Request) -> HTMLResponse:
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         rows = conn.execute(
             """
             SELECT p.immich_asset_id, p.dish_name, p.cuisine, p.taken_at,
@@ -34,9 +31,6 @@ def review_list(request: Request) -> HTMLResponse:
         places = conn.execute(
             "SELECT id, name, type FROM places ORDER BY type, name"
         ).fetchall()
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
 
     templates = request.app.state.templates
     return cast(
@@ -66,9 +60,7 @@ def review_submit(
     now = datetime.now(tz=UTC).isoformat()
 
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         existing = conn.execute(
             "SELECT 1 FROM photo_analysis WHERE immich_asset_id = ?", (asset_id,)
         ).fetchone()
@@ -118,9 +110,6 @@ def review_submit(
             """,
             (asset_id,),
         ).fetchone()
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
 
     templates = request.app.state.templates
     return cast(

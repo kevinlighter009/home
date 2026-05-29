@@ -17,7 +17,7 @@ from typing import Protocol
 
 from home_photo_repo.places.haversine import haversine_m
 from home_photo_repo.places.repository import PlacesRepository
-from home_photo_repo.places.types import CuratedPlace, MatchResult, NearbyPlace
+from home_photo_repo.places.types import VALID_VENUE_TYPES, CuratedPlace, MatchResult, NearbyPlace
 
 
 class _GoogleLike(Protocol):
@@ -26,7 +26,7 @@ class _GoogleLike(Protocol):
     ) -> list[NearbyPlace]: ...
 
 
-_CURATED_VENUE_TYPES = {"home", "office", "friend_place", "restaurant", "outdoor", "other"}
+_CURATED_VENUE_TYPES = set(VALID_VENUE_TYPES)
 
 
 # Google Places returns multiple type strings per place; we pick the first

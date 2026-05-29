@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from typing import cast
 
 from fastapi import APIRouter, Request
@@ -14,9 +13,7 @@ router = APIRouter()
 @router.get("/status", response_class=HTMLResponse)
 def status_page(request: Request) -> HTMLResponse:
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         counts = conn.execute(
             """
             SELECT
@@ -42,9 +39,6 @@ def status_page(request: Request) -> HTMLResponse:
              LIMIT 20
             """
         ).fetchall()
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
 
     templates = request.app.state.templates
     return cast(

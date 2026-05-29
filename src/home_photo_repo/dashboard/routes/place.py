@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from typing import cast
 
 from fastapi import APIRouter, HTTPException, Request
@@ -14,9 +13,7 @@ router = APIRouter()
 @router.get("/place/{place_id}", response_class=HTMLResponse)
 def place_detail(place_id: str, request: Request) -> HTMLResponse:
     deps = request.app.state.deps
-    gen = deps.get_db()
-    conn = next(gen)
-    try:
+    with deps.db_conn() as conn:
         place_row = conn.execute(
             "SELECT * FROM places WHERE id = ?", (place_id,)
         ).fetchone()
@@ -33,9 +30,6 @@ def place_detail(place_id: str, request: Request) -> HTMLResponse:
             """,
             (place_id,),
         ).fetchall()
-    finally:
-        with contextlib.suppress(StopIteration):
-            next(gen)
 
     templates = request.app.state.templates
     return cast(
