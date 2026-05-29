@@ -366,3 +366,6 @@ src/home_photo_repo/
 - **Plan 6** ✅ Done — Follow-up burn-down (worker per-asset isolation,
   centralized thresholds, MLX code-fence stripping, dashboard polish,
   backup script refactor, venue disambiguator).
+- **Plan 7** ✅ Done — Local MLX vision pipeline as a first-class
+  alternative to the Anthropic API. One-command install
+  (`make install-mlx`), default model `Qwen2.5-VL-7B-Instruct-4bit`.
