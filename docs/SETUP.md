@@ -776,7 +776,32 @@ make dev-worker
 
 Log line will show `google_places=enabled` (or `disabled (curated only)`).
 
-## Verification checklist — Plans 1, 2, 3 complete
+## (Plan 4 only) Start the dashboard
+
+In a second terminal (leave the worker running in the first):
+
+```bash
+cd ~/Documents/code/home
+make dev-dashboard
+```
+
+You should see:
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000
+```
+
+Open http://127.0.0.1:8000 in a browser:
+
+- The map should show pins for every food photo with GPS.
+- /feed lists recent food photos.
+- /places lets you add home/office.
+- /review queues low-confidence rows.
+- /status shows pipeline counts and recent worker runs.
+
+To leave running long-term: open the URL once a day, or wait for Plan 5
+(launchd plists) to auto-start it at login.
+
+## Verification checklist — Plans 1–4 complete
 
 - [ ] `make test` → 90 passed
 - [ ] `make smoke-immich` lists assets with GPS
@@ -790,6 +815,11 @@ Log line will show `google_places=enabled` (or `disabled (curated only)`).
 - [ ] (If Google enabled) `make smoke-places` returns real venues
 - [ ] Food photo at a curated location populates `venue_type` correctly (home/office/etc.)
 - [ ] Food photo at an unknown location either matches via Google Places or shows `venue_type='unknown'`
+- [ ] `make dev-dashboard` starts uvicorn on 127.0.0.1:8000
+- [ ] `make smoke-dashboard` prints `OK: http://127.0.0.1:8000/healthz → {'status': 'ok'}`
+- [ ] Map (`/`) shows pins for food photos
+- [ ] Review queue (`/review`) lets you confirm a needs_review item
+- [ ] Places editor (`/places`) shows curated places + can add/delete
 
 When all check, you're production-ready for Plans 1 + 2. Future plans:
 

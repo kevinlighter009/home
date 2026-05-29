@@ -5,12 +5,12 @@ Local home-photo ingestion + analysis service. Sits on top of a self-hosted
 recognition and venue tagging (restaurant via GPS / home / office / etc.),
 plus a localhost dashboard.
 
-This is **Plan 3 (Place Matching)**. After Stage B identifies dish + cuisine,
-the worker resolves the photo's GPS to a venue: either a user-curated
-place (home / office / friend's place / a favorite restaurant) or a
-restaurant looked up via Google Places. Results land in
-`photo_analysis.venue_type` + `place_id`. Plan 4 will surface this in a
-dashboard.
+This is **Plan 4 (Dashboard)**. A localhost-only web UI at
+`http://127.0.0.1:8000` shows a map of food photos pinned by venue,
+per-place dish galleries, a chronological feed, a review queue for
+low-confidence classifications, a curated-places editor, and a worker
+status page. Plan 5 will add launchd plists so the worker and dashboard
+auto-start at login.
 
 **👉 New to this project? See [`docs/SETUP.md`](docs/SETUP.md) for the
 complete fresh-Mac setup guide (Docker, Python, Immich, Anthropic key,
@@ -224,6 +224,42 @@ sqlite3 $SSD_DATA_DIR/db/app.sqlite \
    ORDER BY venue_resolved_at DESC LIMIT 10;"
 ```
 
+## Dashboard
+
+A read-mostly web UI for browsing what the worker has classified.
+
+### Run it
+
+In a separate terminal from the worker:
+
+```bash
+make dev-dashboard
+```
+
+Open http://127.0.0.1:8000. The dashboard binds to localhost only — to
+expose it on the LAN, add HTTP Basic auth first (out of scope here).
+
+### Pages
+
+- **/** — Leaflet map. Pins for every food photo with GPS, popup shows
+  dish + thumbnail + venue link.
+- **/place/{id}** — Every dish recorded at this venue, with thumbnails.
+- **/feed** — Chronological grid of food photos. Filter by venue type;
+  paginated.
+- **/review** — Photos the worker flagged as low-confidence or ambiguous.
+  Inline form to confirm / correct dish + cuisine + venue (HTMX, no page
+  reload).
+- **/places** — CRUD for curated places (home / office / etc.). Cached
+  Google Places rows are listed but read-only.
+- **/status** — Last 20 worker runs + pipeline counts (total, classified,
+  food, with-venue, needs-review).
+
+### Verify it's running
+
+```bash
+make smoke-dashboard      # hits /healthz, prints OK
+```
+
 ## Project layout
 
 ```
@@ -234,26 +270,25 @@ src/home_photo_repo/
 ├── immich_client.py
 ├── immich_types.py
 ├── llm/
-│   ├── factory.py
-│   ├── prompts.py
-│   ├── rate_limiter.py
-│   ├── stage_a.py
-│   ├── stage_b.py
-│   └── providers/
-│       ├── base.py
-│       ├── anthropic_provider.py
-│       └── mlx_provider.py
-├── places/                  ← Plan 3
-│   ├── haversine.py         # great-circle distance
-│   ├── types.py             # CuratedPlace, NearbyPlace, MatchResult
-│   ├── repository.py        # SQL CRUD + nearby() over places table
-│   ├── google_places.py     # Google Places (New) API client
-│   ├── matcher.py           # curated → google → unknown orchestrator
-│   └── cli.py               # python -m home_photo_repo.places.cli ...
+│   └── … (unchanged)
+├── places/
+│   └── … (unchanged)
+├── dashboard/                ← Plan 4
+│   ├── app.py                # FastAPI factory
+│   ├── deps.py               # request-scoped DB / Immich
+│   ├── main.py               # uvicorn entrypoint
+│   ├── routes/
+│   │   ├── proxy.py          # /proxy/thumbnail/{id}
+│   │   ├── map_view.py       # /
+│   │   ├── place.py          # /place/{id}
+│   │   ├── feed.py           # /feed
+│   │   ├── review.py         # /review
+│   │   ├── places_editor.py  # /places
+│   │   └── status.py         # /status
+│   ├── templates/            # Jinja2 + HTMX
+│   └── static/               # vendored Leaflet + HTMX + CSS
 └── worker/
-    ├── cursor.py
-    ├── main.py              # also builds PlaceMatcher
-    └── pipeline.py          # discovered → Stage A → Stage B → venue resolution
+    └── … (unchanged)
 
 migrations/              # forward-only .sql files
 docker/immich/           # Immich docker compose config
@@ -267,6 +302,7 @@ tests/                   # pytest suite, no network
   provider interface (Anthropic default, MLX optional).
 - **Plan 3** ✅ Done — Curated personal places + Google Places fallback
   for venue resolution.
-- **Plan 4** — FastAPI + HTMX + Leaflet dashboard at `localhost:8000`.
+- **Plan 4** ✅ Done — FastAPI + HTMX + Leaflet dashboard at
+  `localhost:8000`.
 - **Plan 5** — Operations: launchd plists, nightly pg_dumpall, MLX
   setup, migration to a new Mac.
