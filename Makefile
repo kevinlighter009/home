@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now
+.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -93,3 +93,19 @@ bootstrap-existing:
 	mkdir -p $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/logs
 	$(PYTHON) -m home_photo_repo.db migrate
 	@echo "bootstrap-existing complete — DB is present, deps installed, migrations applied."
+
+install-mlx:
+	@echo "Installing mlx-vlm (Apple Silicon required)..."
+	uv sync --extra mlx
+	@echo ""
+	@echo "Installing the MLX launchd service..."
+	$(PYTHON) -m launchd.install_launchd mlx
+	@echo ""
+	@echo "MLX installed. Model will download on first run (~5 GB)."
+	@echo "Switch a stage to MLX by setting in .env:"
+	@echo "    LLM_STAGE_A_PROVIDER=mlx"
+	@echo "    LLM_STAGE_B_PROVIDER=mlx"
+	@echo "Then: make smoke-mlx  (verifies end-to-end)"
+
+smoke-mlx:
+	$(PYTHON) scripts/smoke_mlx.py
