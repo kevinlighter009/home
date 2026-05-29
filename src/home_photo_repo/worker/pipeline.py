@@ -20,6 +20,7 @@ from typing import Protocol
 
 from home_photo_repo.immich_client import ImmichAssetNotReadyError
 from home_photo_repo.immich_types import ImmichAsset
+from home_photo_repo.llm.prompts import STAGE_A_VERSION, STAGE_B_VERSION
 from home_photo_repo.llm.providers.base import ProviderError, VisionLLMProvider
 from home_photo_repo.llm.rate_limiter import TokenBucket
 from home_photo_repo.llm.stage_a import StageAResult, run_stage_a
@@ -190,11 +191,12 @@ def _record_stage_a_result(
     conn.execute(
         """
         UPDATE photo_analysis
-           SET stage_a_is_food    = ?,
-               stage_a_confidence = ?,
-               stage_a_model      = ?,
-               stage_a_ran_at     = ?,
-               last_error         = NULL
+           SET stage_a_is_food         = ?,
+               stage_a_confidence      = ?,
+               stage_a_model           = ?,
+               stage_a_ran_at          = ?,
+               stage_a_prompt_version  = ?,
+               last_error              = NULL
          WHERE immich_asset_id = ?
         """,
         (
@@ -202,6 +204,7 @@ def _record_stage_a_result(
             result.confidence,
             result.model,
             now.isoformat(),
+            STAGE_A_VERSION,
             asset_id,
         ),
     )
@@ -234,14 +237,15 @@ def _record_stage_b_result(
     conn.execute(
         """
         UPDATE photo_analysis
-           SET dish_name          = ?,
-               cuisine            = ?,
-               stage_b_confidence = ?,
-               stage_b_model      = ?,
-               stage_b_ran_at     = ?,
-               stage_b_raw_json   = ?,
-               review_status      = ?,
-               last_error         = NULL
+           SET dish_name              = ?,
+               cuisine                = ?,
+               stage_b_confidence     = ?,
+               stage_b_model          = ?,
+               stage_b_ran_at         = ?,
+               stage_b_raw_json       = ?,
+               stage_b_prompt_version = ?,
+               review_status          = ?,
+               last_error             = NULL
          WHERE immich_asset_id = ?
         """,
         (
@@ -251,6 +255,7 @@ def _record_stage_b_result(
             result.model,
             now.isoformat(),
             result.raw_json,
+            STAGE_B_VERSION,
             review_status,
             asset_id,
         ),
