@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}home_photo_repo{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="/static/leaflet/leaflet.css" />
+  <script src="/static/leaflet/leaflet.js" defer></script>
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>home_photo_repo</h1>
+    <nav>
+      <a href="/" class="{% if active == 'map' %}active{% endif %}">Map</a>
+      <a href="/feed" class="{% if active == 'feed' %}active{% endif %}">Feed</a>
+      <a href="/review" class="{% if active == 'review' %}active{% endif %}">Review</a>
+      <a href="/places" class="{% if active == 'places' %}active{% endif %}">Places</a>
+      <a href="/status" class="{% if active == 'status' %}active{% endif %}">Status</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
