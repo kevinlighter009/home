@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from home_photo_repo.config import Settings
 from home_photo_repo.immich_client import ImmichClient
+from home_photo_repo.settings_factory import load_settings
 
 
 def main() -> None:
-    settings = Settings()  # type: ignore[call-arg]
+    settings = load_settings()
     client = ImmichClient(
         base_url=str(settings.immich_base_url),
         api_key=settings.immich_api_key.get_secret_value(),

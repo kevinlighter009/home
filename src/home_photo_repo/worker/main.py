@@ -21,6 +21,7 @@ from home_photo_repo.config import Settings
 from home_photo_repo.db import apply_migrations, get_connection
 from home_photo_repo.immich_client import ImmichClient, ImmichClientError
 from home_photo_repo.immich_types import ImmichAsset
+from home_photo_repo.settings_factory import load_settings
 from home_photo_repo.worker.cursor import read_cursor, write_cursor
 from home_photo_repo.worker.pipeline import ProcessResult, process_asset
 
@@ -163,7 +164,7 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
 
 
 def main() -> None:  # pragma: no cover - process entrypoint
-    settings = Settings()  # type: ignore[call-arg]
+    settings = load_settings()
     run_forever(settings)
 
 

@@ -104,9 +104,9 @@ def apply_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> list[str
 
 def _cli_migrate() -> None:
     """`python -m home_photo_repo.db migrate` — apply migrations using Settings."""
-    from home_photo_repo.config import Settings
+    from home_photo_repo.settings_factory import load_settings
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = load_settings()
     repo_root = Path(__file__).resolve().parents[2]
     migrations_dir = repo_root / "migrations"
     conn = get_connection(settings.db_path)
