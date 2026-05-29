@@ -47,10 +47,14 @@ class Settings(BaseSettings):
     dashboard_bind: str = "127.0.0.1:8000"
 
     # LLM provider selection (consumed in Plan 2)
-    llm_stage_a_provider: str = "anthropic"
+    llm_stage_a_provider: str = "mlx"
     llm_stage_a_model: str = "claude-haiku-4-5"
-    llm_stage_b_provider: str = "anthropic"
+    llm_stage_b_provider: str = "mlx"
     llm_stage_b_model: str = "claude-sonnet-4-5"
+    # When the per-stage provider raises a transient error (connection refused,
+    # timeout, 5xx), automatically retry with this fallback provider. Set to
+    # an empty string to disable fallback (original strict behavior).
+    llm_fallback_provider: str = "anthropic"
 
     # MLX placeholder
     mlx_base_url: str = "http://localhost:8081/v1"
