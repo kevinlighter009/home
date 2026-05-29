@@ -100,3 +100,16 @@ def test_remove_unknown_id_returns_nonzero(tmp_path: Path, capsys: pytest.Captur
     conn = _conn(tmp_path)
     rc = run(["remove", "--id", "curated:does-not-exist"], conn=conn)
     assert rc != 0
+
+
+def test_add_accepts_outdoor_type(tmp_path: Path) -> None:
+    conn = _conn(tmp_path)
+    rc = run(
+        ["add", "--type", "outdoor", "--name", "Park",
+         "--lat", "37.7694", "--lng", "-122.4862"],
+        conn=conn,
+    )
+    assert rc == 0
+    places = PlacesRepository(conn).list_all()
+    assert len(places) == 1
+    assert places[0].type == "outdoor"

@@ -26,7 +26,33 @@ class _GoogleLike(Protocol):
     ) -> list[NearbyPlace]: ...
 
 
-_CURATED_VENUE_TYPES = {"home", "office", "friend_place", "restaurant", "other"}
+_CURATED_VENUE_TYPES = {"home", "office", "friend_place", "restaurant", "outdoor", "other"}
+
+
+# Google Places returns multiple type strings per place; we pick the first
+# that maps into our canonical venue_type bucket.
+_GOOGLE_TYPE_TO_VENUE: dict[str, str] = {
+    "restaurant": "restaurant",
+    "cafe": "restaurant",
+    "bakery": "restaurant",
+    "bar": "restaurant",
+    "meal_delivery": "restaurant",
+    "meal_takeaway": "restaurant",
+    # Future: when we widen included_types to parks etc., map them to 'outdoor'
+}
+
+
+def _classify_google_types(types: tuple[str, ...]) -> str:
+    """Map a Google place's types tuple to our canonical venue_type bucket.
+
+    All current `_FOOD_VENUE_TYPES` map to 'restaurant'; the function exists
+    so the matcher's caching path doesn't have to hardcode the mapping and
+    so we can extend the table later (e.g., parks → outdoor)."""
+    for t in types:
+        bucket = _GOOGLE_TYPE_TO_VENUE.get(t)
+        if bucket is not None:
+            return bucket
+    return "restaurant"  # fallback — we only call this on results from the food query
 
 
 class PlaceMatcher:
@@ -79,16 +105,21 @@ class PlaceMatcher:
         chosen = ranked[0]
         chosen_dist = haversine_m(latitude, longitude, chosen.latitude, chosen.longitude)
 
+        venue_bucket = _classify_google_types(chosen.types)
         cached = CuratedPlace(
             id=f"gplaces:{chosen.google_place_id}",
             name=chosen.name,
-            type="restaurant",
+            type=venue_bucket,
             latitude=chosen.latitude,
             longitude=chosen.longitude,
+            # Use the tight ambiguity threshold as the cache row's radius —
+            # only a very close future photo should re-match this row, otherwise
+            # we'd cluster distinct restaurants on the same block.
             radius_m=self._ambiguous_threshold_m,
             google_place_id=chosen.google_place_id,
             address=chosen.address,
-            notes=None,
+            # Preserve raw Google types for debugging / future re-mapping.
+            notes=",".join(chosen.types) if chosen.types else None,
         )
         with contextlib.suppress(Exception):
             self._repo.insert(cached)
@@ -110,7 +141,7 @@ class PlaceMatcher:
         )
         return MatchResult(
             place_id=cached.id,
-            venue_type="restaurant",
+            venue_type=venue_bucket,
             distance_m=chosen_dist,
             source="google_places",
             needs_review=ambiguous,

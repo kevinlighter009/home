@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from home_photo_repo.places.repository import PlacesRepository
 from home_photo_repo.places.types import CuratedPlace
 
-_VALID_TYPES = ("home", "office", "friend_place", "restaurant", "other")
+_VALID_TYPES = ("home", "office", "friend_place", "restaurant", "outdoor", "other")
 _DEFAULT_RADIUS_M = 50
 
 

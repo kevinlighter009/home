@@ -191,3 +191,29 @@ def test_match_handles_google_error_gracefully(tmp_path: Path) -> None:
     assert result.venue_type == "unknown"
     assert result.needs_review is True
     assert "google" in (result.notes or "").lower()
+
+
+def test_match_classifies_cafe_correctly_when_cached_from_google(tmp_path: Path) -> None:
+    """A Google place with type='cafe' should still cache as venue_type=
+    'restaurant' (our canonical bucket for food venues) — but the raw
+    Google types are preserved in notes for future re-mapping."""
+    conn = _conn(tmp_path)
+    nearby = NearbyPlace(
+        google_place_id="gp-cafe",
+        name="Bluebird Cafe",
+        latitude=37.762,
+        longitude=-122.434,
+        address=None,
+        types=("cafe", "food", "point_of_interest"),
+    )
+    google = FakeGoogleClient(results=[nearby])
+    m = _matcher(conn, google=google)
+
+    result = m.match(latitude=37.762, longitude=-122.434)
+
+    assert result.venue_type == "restaurant"  # canonical bucket
+    cached = PlacesRepository(conn).get_by_id("gplaces:gp-cafe")
+    assert cached is not None
+    assert cached.type == "restaurant"
+    assert cached.notes is not None
+    assert "cafe" in cached.notes  # raw types preserved
