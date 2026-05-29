@@ -78,11 +78,12 @@ Expected: HTTP 200 from `/v1/chat/completions`; response describes the test imag
 ```bash
 LLM_FALLBACK_PROVIDER="" uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 sqlite3 /Users/kailiangchen/Documents/app/db/app.sqlite \
-  "SELECT is_food, dish_label, stage_a_provider, stage_b_provider, \
+  "SELECT immich_asset_id, stage_a_is_food, dish_name, \
+          stage_a_model, stage_b_model, \
           stage_a_prompt_version, stage_b_prompt_version \
-   FROM photo_analysis ORDER BY created_at DESC LIMIT 3;"
+   FROM photo_analysis ORDER BY stage_a_ran_at DESC LIMIT 3;"
 ```
-Expected: rows with `stage_a_provider=mlx`, `stage_b_provider=mlx`, non-null prompt versions.
+Expected: rows with `stage_a_model` and `stage_b_model` starting with `mlx-community/...` (i.e., MLX), non-null prompt versions.
 
 ### 6.4 Performance sanity
 
@@ -111,7 +112,7 @@ Covered by 6.3 — confirm both `stage_a_prompt_version` and `stage_b_prompt_ver
 
 ```bash
 sqlite3 /Users/kailiangchen/Documents/app/db/app.sqlite \
-  "INSERT INTO photo_analysis (asset_id, status) VALUES ('does-not-exist', 'pending');"
+  "INSERT INTO photo_analysis (immich_asset_id, first_seen_at) VALUES ('does-not-exist', datetime('now'));"
 uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 ```
 Expected: worker logs error for the bad row, continues, exits 0.
@@ -180,13 +181,13 @@ Stop MLX (Ctrl-C in Terminal A), then:
 ```bash
 uv run python -m home_photo_repo.worker.main   # Ctrl-C after first poll cycle
 sqlite3 /Users/kailiangchen/Documents/app/db/app.sqlite \
-  "SELECT asset_id, stage_a_provider, stage_b_provider FROM photo_analysis \
-   ORDER BY created_at DESC LIMIT 3;"
+  "SELECT immich_asset_id, stage_a_model, stage_b_model FROM photo_analysis \
+   ORDER BY stage_a_ran_at DESC LIMIT 3;"
 ```
 Expected:
 - Log: `MLX server at … unreachable (…) — fallback will be used per-call`
 - Per-asset warning: `primary mlx failed (transient): …; falling back to anthropic`
-- Rows show `stage_a_provider=anthropic`, `stage_b_provider=anthropic`
+- Rows show `stage_a_model` and `stage_b_model` starting with `claude-…` (Anthropic took over)
 
 ### 8.4 Auth-error does NOT trigger retry
 
