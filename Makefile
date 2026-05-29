@@ -68,3 +68,6 @@ logs:
 	@LOG_DIR=$$HOME/Library/Logs/home_photo_repo; \
 	test -d "$$LOG_DIR" || (echo "log dir $$LOG_DIR does not exist yet — has install-launchd run?" && exit 1); \
 	tail -f $$LOG_DIR/*.log
+
+backup-now:
+	scripts/backup_postgres.sh
