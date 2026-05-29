@@ -738,7 +738,45 @@ docker volume prune -f
 
 ---
 
-## Verification checklist — Plan 1 + Plan 2 complete
+## (Plan 3 only) Add curated places + Google Places key
+
+### A. Add your curated places
+
+```bash
+uv run python -m home_photo_repo.places.cli add \
+    --type home --name "Home" --lat <YOUR-LAT> --lng <YOUR-LNG>
+
+uv run python -m home_photo_repo.places.cli add \
+    --type office --name "Work" --lat <LAT> --lng <LNG>
+
+# Add as many friend_place / restaurant entries as you like.
+uv run python -m home_photo_repo.places.cli list
+```
+
+Finding your home's lat/lng: take a photo of your kitchen with your iPhone
+(make sure Camera has Location Services on), upload via Immich, then check:
+
+```bash
+sqlite3 $SSD_DATA_DIR/db/app.sqlite \
+  "SELECT latitude, longitude FROM photo_analysis ORDER BY first_seen_at DESC LIMIT 1;"
+```
+
+### B. (Optional) Enable Google Places fallback
+
+1. Google Cloud Console → enable "Places API (New)"
+2. Create an API key, restrict to Places API (New)
+3. `.env` → `GOOGLE_PLACES_API_KEY=AIza...`
+4. `make smoke-places` should print real venues near the default coords.
+
+### C. Restart the worker
+
+```bash
+make dev-worker
+```
+
+Log line will show `google_places=enabled` (or `disabled (curated only)`).
+
+## Verification checklist — Plans 1, 2, 3 complete
 
 - [ ] `make test` → 90 passed
 - [ ] `make smoke-immich` lists assets with GPS
@@ -748,6 +786,10 @@ docker volume prune -f
 - [ ] Food photo has populated `dish_name` + `cuisine`
 - [ ] Non-food photo has `stage_a_is_food=0` and `dish_name=NULL`
 - [ ] Worker restart doesn't duplicate rows
+- [ ] `uv run python -m home_photo_repo.places.cli list` shows your curated places
+- [ ] (If Google enabled) `make smoke-places` returns real venues
+- [ ] Food photo at a curated location populates `venue_type` correctly (home/office/etc.)
+- [ ] Food photo at an unknown location either matches via Google Places or shows `venue_type='unknown'`
 
 When all check, you're production-ready for Plans 1 + 2. Future plans:
 

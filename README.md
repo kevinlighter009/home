@@ -5,10 +5,12 @@ Local home-photo ingestion + analysis service. Sits on top of a self-hosted
 recognition and venue tagging (restaurant via GPS / home / office / etc.),
 plus a localhost dashboard.
 
-This is **Plan 2 (LLM Pipeline)**. The worker now classifies each ingested
-photo: Stage A (Claude Haiku 4.5) decides whether the photo is food, and
-food photos additionally get Stage B (Claude Sonnet 4.5) which fills in
-`dish_name` and `cuisine`. Venue / restaurant assignment is Plan 3.
+This is **Plan 3 (Place Matching)**. After Stage B identifies dish + cuisine,
+the worker resolves the photo's GPS to a venue: either a user-curated
+place (home / office / friend's place / a favorite restaurant) or a
+restaurant looked up via Google Places. Results land in
+`photo_analysis.venue_type` + `place_id`. Plan 4 will surface this in a
+dashboard.
 
 **👉 New to this project? See [`docs/SETUP.md`](docs/SETUP.md) for the
 complete fresh-Mac setup guide (Docker, Python, Immich, Anthropic key,
@@ -154,29 +156,104 @@ sqlite3 $SSD_DATA_DIR/db/app.sqlite \
    ORDER BY stage_a_ran_at DESC LIMIT 10;"
 ```
 
+## Curated places & Google Places
+
+The pipeline resolves each food photo to a venue. Curated places (the
+ones you care about — home, office, friends' places, favorite
+restaurants) are looked up first from the local `places` table; anything
+unmatched falls back to a Google Places Nearby Search.
+
+### Setting up Google Places (optional)
+
+The worker runs fine without a Google Places key — photos at unrecognized
+locations just get `venue_type='unknown'` and `review_status='needs_review'`.
+To enable the fallback:
+
+1. Open https://console.cloud.google.com → create a new project or pick an
+   existing one.
+2. Enable the **Places API (New)** under APIs & Services → Library.
+3. Create an API key under Credentials. Restrict it to "Places API (New)"
+   and, for safety, your home's IP.
+4. Put the key in `.env`:
+   ```dotenv
+   GOOGLE_PLACES_API_KEY=AIza...
+   ```
+5. Restart the worker (`Ctrl-C` then `make dev-worker`). The log line
+   should now say `google_places=enabled`.
+6. Verify with `make smoke-places` — it should print real restaurants near
+   the default San Francisco Ferry Building coords.
+
+The Google Maps Platform free tier is **$200/month**; at our scale
+(~tens of calls/month) this stays comfortably free forever.
+
+### Adding curated places
+
+```bash
+# Home, with 60-meter match radius:
+uv run python -m home_photo_repo.places.cli add \
+    --type home --name "Home" --lat 37.7749 --lng -122.4194 --radius 60
+
+# Your office:
+uv run python -m home_photo_repo.places.cli add \
+    --type office --name "Work" --lat 37.78 --lng -122.40
+
+# A friend's place:
+uv run python -m home_photo_repo.places.cli add \
+    --type friend_place --name "Sarah's apartment" \
+    --lat 37.765 --lng -122.42 --notes "downstairs neighbor"
+
+# A favorite restaurant (curated entry; bypasses Google Places lookup):
+uv run python -m home_photo_repo.places.cli add \
+    --type restaurant --name "Mimi's Trattoria" \
+    --lat 37.7619 --lng -122.4341 --radius 30
+
+# Review:
+uv run python -m home_photo_repo.places.cli list
+
+# Remove:
+uv run python -m home_photo_repo.places.cli remove --id curated:<uuid>
+```
+
+### Verifying the venue pipeline
+
+```bash
+sqlite3 $SSD_DATA_DIR/db/app.sqlite \
+  "SELECT dish_name, venue_type, place_id, place_match_source, place_match_distance_m \
+   FROM photo_analysis \
+   WHERE venue_resolved_at IS NOT NULL \
+   ORDER BY venue_resolved_at DESC LIMIT 10;"
+```
+
 ## Project layout
 
 ```
 src/home_photo_repo/
 ├── config.py
-├── settings_factory.py     # load_settings()
+├── settings_factory.py
 ├── db.py
-├── immich_client.py        # search_metadata + get_thumbnail + get_original
+├── immich_client.py
 ├── immich_types.py
 ├── llm/
-│   ├── factory.py          # build_provider(role, settings)
-│   ├── prompts.py          # versioned Stage A/B prompts + schemas
-│   ├── rate_limiter.py     # token bucket
-│   ├── stage_a.py          # run_stage_a(provider, image_bytes)
-│   ├── stage_b.py          # run_stage_b(provider, image_bytes)
+│   ├── factory.py
+│   ├── prompts.py
+│   ├── rate_limiter.py
+│   ├── stage_a.py
+│   ├── stage_b.py
 │   └── providers/
-│       ├── base.py         # VisionLLMProvider Protocol
+│       ├── base.py
 │       ├── anthropic_provider.py
 │       └── mlx_provider.py
+├── places/                  ← Plan 3
+│   ├── haversine.py         # great-circle distance
+│   ├── types.py             # CuratedPlace, NearbyPlace, MatchResult
+│   ├── repository.py        # SQL CRUD + nearby() over places table
+│   ├── google_places.py     # Google Places (New) API client
+│   ├── matcher.py           # curated → google → unknown orchestrator
+│   └── cli.py               # python -m home_photo_repo.places.cli ...
 └── worker/
-    ├── cursor.py           # composite (updated_at, id) cursor
-    ├── main.py             # poll loop, build providers, run_once
-    └── pipeline.py         # discovered → Stage A → maybe Stage B
+    ├── cursor.py
+    ├── main.py              # also builds PlaceMatcher
+    └── pipeline.py          # discovered → Stage A → Stage B → venue resolution
 
 migrations/              # forward-only .sql files
 docker/immich/           # Immich docker compose config
@@ -188,8 +265,8 @@ tests/                   # pytest suite, no network
 
 - **Plan 2** ✅ Done — Stage A (Haiku) + Stage B (Sonnet) with pluggable
   provider interface (Anthropic default, MLX optional).
-- **Plan 3** — Place matching: curated personal places + Google Places
-  fallback for restaurant resolution.
+- **Plan 3** ✅ Done — Curated personal places + Google Places fallback
+  for venue resolution.
 - **Plan 4** — FastAPI + HTMX + Leaflet dashboard at `localhost:8000`.
 - **Plan 5** — Operations: launchd plists, nightly pg_dumpall, MLX
   setup, migration to a new Mac.
