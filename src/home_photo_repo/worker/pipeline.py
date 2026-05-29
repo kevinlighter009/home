@@ -42,6 +42,7 @@ class ProcessResult(enum.Enum):
     ALREADY_PRESENT = "already_present"
     DEFERRED_NOT_READY = "deferred_not_ready"
     STAGE_A_NOT_FOOD = "stage_a_not_food"
+    STAGE_A_DONE_NO_STAGE_B = "stage_a_done_no_stage_b"
     STAGE_A_AND_B_DONE = "stage_a_and_b_done"
     STAGE_A_ONLY_ERROR = "stage_a_only_error"
     STAGE_B_ERROR = "stage_b_error"
@@ -159,8 +160,9 @@ def process_asset(
         return ProcessResult.STAGE_A_NOT_FOOD
 
     if stage_b_provider is None:
-        # Configured Stage A only.
-        return ProcessResult.STAGE_A_NOT_FOOD
+        # Food per Stage A, but Stage B not configured — distinct from
+        # NOT_FOOD so dashboards/queries can tell the two cases apart.
+        return ProcessResult.STAGE_A_DONE_NO_STAGE_B
 
     # --- Stage B ---
     try:

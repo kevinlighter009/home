@@ -340,3 +340,25 @@ def test_pipeline_defers_when_thumbnail_not_ready(tmp_path: Path) -> None:
     ).fetchone()
     assert row2["stage_a_ran_at"] is not None
     assert row2["dish_name"] == "x"
+
+
+def test_pipeline_returns_no_stage_b_when_food_but_b_unwired(tmp_path: Path) -> None:
+    """When Stage A says food but no Stage B provider is configured, return
+    STAGE_A_DONE_NO_STAGE_B (not STAGE_A_NOT_FOOD which is semantically wrong)."""
+    from home_photo_repo.worker.pipeline import ProcessResult, process_asset
+
+    conn = _conn(tmp_path)
+    stage_a = FakeProvider("anthropic", {"is_food": True, "confidence": 0.95})
+    immich = FakeImmich()
+
+    result = process_asset(
+        conn, _asset(), now=_asset().updated_at,
+        immich=immich, stage_a_provider=stage_a, stage_b_provider=None,
+    )
+
+    assert result is ProcessResult.STAGE_A_DONE_NO_STAGE_B
+    row = conn.execute(
+        "SELECT stage_a_is_food, dish_name FROM photo_analysis"
+    ).fetchone()
+    assert row["stage_a_is_food"] == 1
+    assert row["dish_name"] is None
