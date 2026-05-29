@@ -24,6 +24,7 @@ _LAUNCH_AGENTS = Path.home() / "Library" / "LaunchAgents"
 _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
 # The three core services. MLX is optional and installed separately if desired.
+# Install side keeps this list short — installing MLX requires explicit opt-in.
 _SERVICES: tuple[str, ...] = ("worker", "dashboard", "backup")
 
 

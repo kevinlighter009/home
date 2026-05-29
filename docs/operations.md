@@ -95,9 +95,11 @@ BACKUP_DIR=/tmp/test-backup scripts/backup_postgres.sh
 ### Restore from a backup
 
 ```bash
-# Stop the dashboard + worker first so nothing's writing.
-launchctl bootout gui/$UID/com.homephoto.worker
-launchctl bootout gui/$UID/com.homephoto.dashboard
+# Stop services cleanly (preferred — single command):
+make uninstall-launchd
+# (Alternatively, if you want to keep the plists around for one-step re-install:
+#  launchctl bootout gui/$UID/com.homephoto.worker  and the same for dashboard.
+#  The plist files in ~/Library/LaunchAgents stay on disk that way.)
 
 cd ~/Documents/code/home/docker/immich
 docker compose down
@@ -114,9 +116,8 @@ gunzip -c /path/to/immich_YYYY-MM-DD_HHMMSS.sql.gz | \
 # Bring the rest up.
 docker compose up -d
 
-# Re-load launchd services.
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.homephoto.worker.plist
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.homephoto.dashboard.plist
+# Re-load launchd services (re-renders plists from templates):
+make install-launchd
 ```
 
 ---
@@ -196,6 +197,11 @@ uv run mlx_vlm.server --model mlx-community/Qwen2-VL-2B-Instruct-4bit --port 808
 uv run python -m launchd.install_launchd mlx
 ```
 
+> **Note:** the MLX plist template hardcodes the model name
+> `mlx-community/Qwen2-VL-2B-Instruct-4bit`. To switch models, edit
+> `launchd/com.homephoto.mlx.plist.template`, then re-run
+> `uv run python -m launchd.install_launchd mlx`.
+
 ### Switch the pipeline to MLX
 
 Edit `.env`:
@@ -246,6 +252,11 @@ Common causes:
 - `uv` not on PATH for the launchd process (the plist sets PATH explicitly;
   if you moved uv, edit the template and re-install)
 - SSD not mounted (when `SSD_DATA_DIR=/Volumes/PhotoSSD/...`)
+- **`SSD_DATA_DIR` mismatch between interactive shell and launchd.** launchd
+  does NOT inherit your shell's environment — only what's in `.env` and what
+  the plist's `EnvironmentVariables` block defines. If you set
+  `SSD_DATA_DIR` only in `~/.zshrc`, the launchd-spawned worker silently
+  falls back to `$HOME/home_photo_repo_data`. Always set it in `.env`.
 
 ### Backups not running at 03:00
 

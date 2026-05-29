@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 
 _LAUNCH_AGENTS = Path.home() / "Library" / "LaunchAgents"
+# Uninstall side includes 'mlx' even though the default install doesn't —
+# `make uninstall-launchd` should clean up MLX if it was previously installed.
 _SERVICES: tuple[str, ...] = ("worker", "dashboard", "backup", "mlx")
 
 

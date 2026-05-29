@@ -334,6 +334,11 @@ def _record_venue_match(
     match: MatchResult,
     now: datetime,
 ) -> None:
+    # NB: when match.needs_review, this overwrites any review_notes previously
+    # set by Stage B (low confidence). That's intentional — venue ambiguity is
+    # more actionable than Stage B confidence, so we surface it on the
+    # dashboard's review row. If Stage B's note matters for a particular
+    # asset, the user can correct it manually via the review form.
     # If the match itself is ambiguous, escalate review_status; but don't
     # downgrade an already-confirmed/auto status without reason.
     if match.needs_review:
