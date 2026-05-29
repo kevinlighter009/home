@@ -20,8 +20,8 @@ def main() -> None:
     )
     # Look back 30 days so the script works on quiet days.
     since = datetime.now(tz=UTC) - timedelta(days=30)
-    assets = client.search_metadata(updated_after=since, size=5, order="asc")
-    print(f"Connected to {settings.immich_base_url}; got {len(assets)} assets:")
+    assets = client.search_metadata(updated_after=since, size=5, order="desc")
+    print(f"Connected to {settings.immich_base_url}; got {len(assets)} most recent assets:")
     for a in assets:
         gps = (
             f"({a.latitude:.4f},{a.longitude:.4f})"

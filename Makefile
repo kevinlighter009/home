@@ -1,4 +1,4 @@
-.PHONY: bootstrap dev-worker test lint typecheck format smoke-immich
+.PHONY: bootstrap ensure-db dev-worker test lint typecheck format smoke-immich
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -6,14 +6,29 @@ PYTEST := uv run pytest
 bootstrap:
 	uv venv
 	uv sync --all-extras
-	@test -f .env || (cp .env.example .env && chmod 600 .env && echo "Created .env from template — fill in keys then re-run bootstrap")
-	@test -f .env && chmod 600 .env
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		chmod 600 .env; \
+		echo ""; \
+		echo "ERROR: Created .env from template. Edit it (IMMICH_API_KEY etc.) and re-run 'make bootstrap'."; \
+		exit 1; \
+	fi
+	@chmod 600 .env
+	@if grep -qE '^(IMMICH_API_KEY|ANTHROPIC_API_KEY)=replace_me' .env; then \
+		echo ""; \
+		echo "ERROR: .env still contains 'replace_me' placeholder secrets. Fill them in and re-run."; \
+		exit 1; \
+	fi
 	mkdir -p $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/db
 	mkdir -p $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/logs
 	$(PYTHON) -m home_photo_repo.db migrate
 	@echo "Bootstrap complete."
 
-dev-worker:
+ensure-db:
+	@if [ ! -f .env ]; then echo "ERROR: .env missing. Run 'make bootstrap' first."; exit 1; fi
+	$(PYTHON) -m home_photo_repo.db migrate
+
+dev-worker: ensure-db
 	$(PYTHON) -m home_photo_repo.worker.main
 
 test:
@@ -28,5 +43,5 @@ typecheck:
 format:
 	uv run ruff format src tests
 
-smoke-immich:
+smoke-immich: ensure-db
 	$(PYTHON) scripts/smoke_immich.py
