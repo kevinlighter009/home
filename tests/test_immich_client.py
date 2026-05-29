@@ -147,6 +147,23 @@ def test_search_metadata_raises_on_missing_updated_at() -> None:
         _client().search_metadata(updated_after=datetime(2026, 5, 27, tzinfo=UTC))
 
 
+@respx.mock
+def test_search_metadata_filters_already_seen_with_last_id() -> None:
+    """When last_id is set, items at or before that (timestamp, id) are dropped."""
+    fixture = _load_fixture("immich_search_metadata.json")
+    respx.post("http://immich.local:2283/api/search/metadata").mock(
+        return_value=httpx.Response(200, json=fixture)
+    )
+    # asset-uuid-1 updated_at: 2026-05-27T18:42:15.000Z
+    cursor_ts = datetime(2026, 5, 27, 18, 42, 15, tzinfo=UTC)
+    assets = _client().search_metadata(
+        updated_after=cursor_ts, last_id="asset-uuid-1", size=100
+    )
+    # Only asset-uuid-2 should remain.
+    assert len(assets) == 1
+    assert assets[0].id == "asset-uuid-2"
+
+
 def test_client_context_manager_closes() -> None:
     """Using the client as a context manager calls close on exit."""
     closed = {"called": False}

@@ -59,10 +59,18 @@ class ImmichClient:
         self,
         *,
         updated_after: datetime,
+        last_id: str = "",
         size: int = 100,
         order: str = "asc",
     ) -> list[ImmichAsset]:
-        """Fetch assets updated after `updated_after`, oldest-first by default."""
+        """Fetch assets updated after `updated_after`, oldest-first by default.
+
+        Tied-timestamp handling: Immich's `updatedAfter` filter is strict, but
+        when multiple assets share `updated_at`, the filter alone can't tell
+        Immich which of them we've already seen. So we request `updated_after=ts`
+        and post-filter on the client to drop any item whose
+        `(updated_at, id) <= (ts, last_id)`.
+        """
         body = {
             "updatedAfter": updated_after.isoformat(),
             "withExif": True,
@@ -74,7 +82,9 @@ class ImmichClient:
             items = resp["assets"]["items"]
         except (KeyError, TypeError) as e:
             raise ImmichClientError(f"unexpected response shape: {e!r}") from e
-        return [self._parse_asset(item) for item in items]
+        parsed = [self._parse_asset(item) for item in items]
+        # Drop items the cursor has already passed.
+        return [a for a in parsed if (a.updated_at, a.id) > (updated_after, last_id)]
 
     # --- internals ----------------------------------------------------------
 

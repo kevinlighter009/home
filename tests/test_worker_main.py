@@ -23,8 +23,13 @@ class FakeImmich:
         self._batches = list(batches)
         self.calls: list[dict[str, Any]] = []
 
-    def search_metadata(self, *, updated_after, size=100, order="asc"):
-        self.calls.append({"updated_after": updated_after, "size": size, "order": order})
+    def search_metadata(self, *, updated_after, last_id="", size=100, order="asc"):
+        self.calls.append({
+            "updated_after": updated_after,
+            "last_id": last_id,
+            "size": size,
+            "order": order,
+        })
         if not self._batches:
             return []
         return self._batches.pop(0)
@@ -63,9 +68,10 @@ def test_run_once_processes_assets_and_advances_cursor(tmp_path: Path) -> None:
     assert summary.assets_processed == 3
     assert summary.errors == 0
     # Cursor advanced to the latest updated_at
-    assert read_cursor(conn) == assets[-1].updated_at
+    assert read_cursor(conn) == (assets[-1].updated_at, assets[-1].id)
     # Initial call used EPOCH_CURSOR
     assert fake.calls[0]["updated_after"] == EPOCH_CURSOR
+    assert fake.calls[0]["last_id"] == ""
 
 
 def test_run_once_catches_up_when_batch_full(tmp_path: Path) -> None:
@@ -105,7 +111,7 @@ def test_run_once_on_immich_error_records_error_and_does_not_advance(tmp_path: P
     class BrokenImmich:
         calls = 0
 
-        def search_metadata(self, *, updated_after, size=100, order="asc"):
+        def search_metadata(self, *, updated_after, last_id="", size=100, order="asc"):
             BrokenImmich.calls += 1
             raise ImmichClientError("simulated outage")
 
@@ -114,7 +120,7 @@ def test_run_once_on_immich_error_records_error_and_does_not_advance(tmp_path: P
     summary = run_once(conn, BrokenImmich(), batch_size=100, now=fixed_now)
 
     assert summary.errors == 1
-    assert read_cursor(conn) == EPOCH_CURSOR  # unchanged
+    assert read_cursor(conn) == (EPOCH_CURSOR, "")  # unchanged
     row = conn.execute("SELECT errors, notes FROM worker_runs").fetchone()
     assert row["errors"] == 1
     assert "simulated outage" in (row["notes"] or "")

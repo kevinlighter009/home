@@ -30,7 +30,12 @@ log = logging.getLogger(__name__)
 
 class _ImmichLike(Protocol):
     def search_metadata(
-        self, *, updated_after: datetime, size: int = ..., order: str = ...
+        self,
+        *,
+        updated_after: datetime,
+        last_id: str = ...,
+        size: int = ...,
+        order: str = ...,
     ) -> list[ImmichAsset]: ...
 
 
@@ -60,10 +65,13 @@ def run_once(
     run_id = _begin_run(conn, current_time)
     try:
         while True:
-            cursor = read_cursor(conn)
+            cursor_ts, cursor_last_id = read_cursor(conn)
             try:
                 assets = immich.search_metadata(
-                    updated_after=cursor, size=batch_size, order="asc"
+                    updated_after=cursor_ts,
+                    last_id=cursor_last_id,
+                    size=batch_size,
+                    order="asc",
                 )
             except ImmichClientError as e:
                 summary.errors += 1
@@ -87,7 +95,7 @@ def run_once(
                 else:
                     if result is not ProcessResult.DEFERRED_NOT_READY:
                         summary.assets_processed += 1
-                    write_cursor(conn, asset.updated_at)
+                    write_cursor(conn, asset.updated_at, last_id=asset.id)
             else:
                 # whole batch processed without break
                 if len(assets) < batch_size:
