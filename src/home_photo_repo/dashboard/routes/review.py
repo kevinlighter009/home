@@ -56,6 +56,11 @@ def review_submit(
     place_id: str = Form(""),
     decision: str = Form("confirm"),
 ) -> HTMLResponse:
+    if decision not in {"confirm", "correct"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"decision must be 'confirm' or 'correct', got {decision!r}",
+        )
     new_status = "corrected" if decision == "correct" else "confirmed"
     now = datetime.now(tz=UTC).isoformat()
 

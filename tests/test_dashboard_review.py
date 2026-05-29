@@ -100,6 +100,15 @@ def test_review_post_with_decision_corrected_marks_status(client: tuple[TestClie
     assert row["review_status"] == "corrected"
 
 
+def test_review_post_rejects_invalid_decision(client: tuple[TestClient, Path]) -> None:
+    c, _ = client
+    response = c.post(
+        "/review/asset-needs",
+        data={"dish_name": "x", "cuisine": "y", "place_id": "", "decision": "frobnicate"},
+    )
+    assert response.status_code == 400
+
+
 def test_review_post_unknown_asset_returns_404(client: tuple[TestClient, Path]) -> None:
     c, _ = client
     response = c.post(

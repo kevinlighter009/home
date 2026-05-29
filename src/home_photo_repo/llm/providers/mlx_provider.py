@@ -22,6 +22,17 @@ from home_photo_repo.llm.providers.base import (
 )
 
 
+def _strip_code_fences(text: str) -> str:
+    """Strip leading/trailing ```json...``` or ``` fences if present."""
+    s = text.strip()
+    if s.startswith("```"):
+        # Drop the opening fence and any 'json' marker
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+    if s.endswith("```"):
+        s = s[: -3].rstrip()
+    return s
+
+
 class MLXProvider:
     name: str = "mlx"
 
@@ -99,7 +110,7 @@ class MLXProvider:
             raise ProviderError(f"mlx response missing expected fields: {e!r}") from e
 
         try:
-            parsed = json.loads(content)
+            parsed = json.loads(_strip_code_fences(content))
         except ValueError as e:
             raise ProviderError(
                 f"mlx model did not emit valid JSON: {content[:200]!r}"

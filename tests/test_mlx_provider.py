@@ -88,3 +88,43 @@ def test_classify_raises_when_content_not_json() -> None:
 
 def test_name_is_mlx() -> None:
     assert _provider().name == "mlx"
+
+
+@respx.mock
+def test_classify_strips_markdown_code_fences_from_json() -> None:
+    """Local models sometimes wrap JSON in ```json ... ``` fences. Strip them."""
+    fixture = {
+        "id": "x", "object": "chat.completion", "created": 0, "model": "m",
+        "choices": [{"index": 0, "message": {"role": "assistant",
+                     "content": "```json\n{\"is_food\": true, \"confidence\": 0.9}\n```"},
+                     "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+    }
+    respx.post("http://localhost:8081/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=fixture)
+    )
+    result = _provider().classify(
+        image_bytes=b"x", prompt="p",
+        response_schema={"type": "object", "properties": {}, "required": []},
+    )
+    assert result.parsed == {"is_food": True, "confidence": 0.9}
+
+
+@respx.mock
+def test_classify_strips_plain_code_fences_too() -> None:
+    """Some models use ``` without 'json' marker."""
+    fixture = {
+        "id": "x", "object": "chat.completion", "created": 0, "model": "m",
+        "choices": [{"index": 0, "message": {"role": "assistant",
+                     "content": "```\n{\"x\": 1}\n```"},
+                     "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+    }
+    respx.post("http://localhost:8081/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=fixture)
+    )
+    result = _provider().classify(
+        image_bytes=b"x", prompt="p",
+        response_schema={"type": "object", "properties": {}, "required": []},
+    )
+    assert result.parsed == {"x": 1}

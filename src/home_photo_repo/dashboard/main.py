@@ -10,8 +10,18 @@ from home_photo_repo.settings_factory import load_settings
 
 def main() -> None:  # pragma: no cover - process entrypoint
     settings = load_settings()
-    host, _, port_str = settings.dashboard_bind.partition(":")
-    port = int(port_str) if port_str else 8000
+    host, sep, port_str = settings.dashboard_bind.partition(":")
+    if not sep or not port_str:
+        raise RuntimeError(
+            f"DASHBOARD_BIND must be in the form 'host:port', got "
+            f"{settings.dashboard_bind!r}. Example: '127.0.0.1:8000'."
+        )
+    try:
+        port = int(port_str)
+    except ValueError as e:
+        raise RuntimeError(
+            f"DASHBOARD_BIND port must be an integer, got {port_str!r}"
+        ) from e
     app = create_app(
         db_path=settings.db_path,
         immich_base_url=str(settings.immich_base_url),
