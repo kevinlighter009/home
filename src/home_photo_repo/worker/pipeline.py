@@ -25,6 +25,8 @@ from home_photo_repo.llm.providers.base import ProviderError, VisionLLMProvider
 from home_photo_repo.llm.rate_limiter import TokenBucket
 from home_photo_repo.llm.stage_a import StageAResult, run_stage_a
 from home_photo_repo.llm.stage_b import StageBResult, run_stage_b
+from home_photo_repo.places.matcher import PlaceMatcher
+from home_photo_repo.places.types import MatchResult
 
 READINESS_MAX_AGE: timedelta = timedelta(minutes=10)
 
@@ -60,6 +62,7 @@ def process_asset(
     rate_limiter: TokenBucket | None = None,
     stage_a_food_threshold: float = 0.6,
     stage_b_review_threshold: float = 0.7,
+    place_matcher: PlaceMatcher | None = None,
 ) -> ProcessResult:
     """Process one asset.
 
@@ -179,6 +182,17 @@ def process_asset(
     _record_stage_b_result(
         conn, asset.id, stage_b, current_time, needs_review=needs_review
     )
+
+    # Venue resolution (Plan 3). Only runs if a matcher was provided AND the
+    # photo has GPS. The matcher itself decides curated vs google vs unknown.
+    if (
+        place_matcher is not None
+        and asset.latitude is not None
+        and asset.longitude is not None
+    ):
+        match = place_matcher.match(latitude=asset.latitude, longitude=asset.longitude)
+        _record_venue_match(conn, asset.id, match, current_time)
+
     return ProcessResult.STAGE_A_AND_B_DONE
 
 
@@ -275,6 +289,59 @@ def _record_stage_b_error(
         """,
         (f"stage_b: {message}", asset_id),
     )
+
+
+def _record_venue_match(
+    conn: sqlite3.Connection,
+    asset_id: str,
+    match: MatchResult,
+    now: datetime,
+) -> None:
+    # If the match itself is ambiguous, escalate review_status; but don't
+    # downgrade an already-confirmed/auto status without reason.
+    if match.needs_review:
+        conn.execute(
+            """
+            UPDATE photo_analysis
+               SET venue_type             = ?,
+                   place_id               = ?,
+                   place_match_source     = ?,
+                   place_match_distance_m = ?,
+                   venue_resolved_at      = ?,
+                   review_status          = 'needs_review',
+                   review_notes           = ?
+             WHERE immich_asset_id = ?
+            """,
+            (
+                match.venue_type,
+                match.place_id,
+                match.source,
+                match.distance_m,
+                now.isoformat(),
+                match.notes,
+                asset_id,
+            ),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE photo_analysis
+               SET venue_type             = ?,
+                   place_id               = ?,
+                   place_match_source     = ?,
+                   place_match_distance_m = ?,
+                   venue_resolved_at      = ?
+             WHERE immich_asset_id = ?
+            """,
+            (
+                match.venue_type,
+                match.place_id,
+                match.source,
+                match.distance_m,
+                now.isoformat(),
+                asset_id,
+            ),
+        )
 
 
 __all__ = ["READINESS_MAX_AGE", "ProcessResult", "process_asset"]
