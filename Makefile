@@ -1,4 +1,4 @@
-.PHONY: bootstrap ensure-db dev-worker test lint typecheck format smoke-immich
+.PHONY: bootstrap ensure-db dev-worker test lint typecheck format smoke-immich smoke-llm
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -45,3 +45,6 @@ format:
 
 smoke-immich: ensure-db
 	$(PYTHON) scripts/smoke_immich.py
+
+smoke-llm:
+	$(PYTHON) scripts/smoke_llm.py
