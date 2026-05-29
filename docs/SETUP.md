@@ -801,7 +801,7 @@ Open http://127.0.0.1:8000 in a browser:
 To leave running long-term: open the URL once a day, or wait for Plan 5
 (launchd plists) to auto-start it at login.
 
-## Verification checklist — Plans 1–4 complete
+## Verification checklist — All plans complete
 
 - [ ] `make test` → 90 passed
 - [ ] `make smoke-immich` lists assets with GPS
@@ -820,9 +820,33 @@ To leave running long-term: open the URL once a day, or wait for Plan 5
 - [ ] Map (`/`) shows pins for food photos
 - [ ] Review queue (`/review`) lets you confirm a needs_review item
 - [ ] Places editor (`/places`) shows curated places + can add/delete
+- [ ] `make install-launchd` succeeds; `launchctl list | grep com.homephoto` shows 3 services
+- [ ] `make logs` tails active worker + dashboard logs
+- [ ] `make backup-now` produces a `.sql.gz` under `$BACKUP_DIR`
+- [ ] After a reboot, the dashboard is reachable at http://127.0.0.1:8000 without manual start
 
 When all check, you're production-ready for Plans 1 + 2. Future plans:
 
 - **Plan 3** — Place matching (curated personal places + Google Places fallback)
 - **Plan 4** — FastAPI + HTMX + Leaflet dashboard at `localhost:8000`
 - **Plan 5** — launchd plists, nightly `pg_dumpall`, MLX setup, migration to new Mac
+
+## (Plan 5) Make it run forever
+
+After the dashboard works manually:
+
+```bash
+make install-launchd
+```
+
+This installs three launchd user services that start at login and
+restart on crash:
+
+- `com.homephoto.worker`
+- `com.homephoto.dashboard`
+- `com.homephoto.backup` (daily 03:00)
+
+See [`docs/operations.md`](operations.md) for verification, restoring
+from backups, migration to a new Mac, and the optional MLX server.
+
+You're done. Open http://127.0.0.1:8000 whenever you want to browse.

@@ -5,12 +5,15 @@ Local home-photo ingestion + analysis service. Sits on top of a self-hosted
 recognition and venue tagging (restaurant via GPS / home / office / etc.),
 plus a localhost dashboard.
 
-This is **Plan 4 (Dashboard)**. A localhost-only web UI at
-`http://127.0.0.1:8000` shows a map of food photos pinned by venue,
-per-place dish galleries, a chronological feed, a review queue for
-low-confidence classifications, a curated-places editor, and a worker
-status page. Plan 5 will add launchd plists so the worker and dashboard
-auto-start at login.
+This is **Plan 5 (Operations)** — and the project is feature-complete.
+The worker and dashboard auto-start at login via macOS launchd, a nightly
+Postgres backup keeps a rotating 14-day history, and the codebase
+supports migration to a new Mac via a single `make bootstrap-existing`
+once the SSD is plugged in.
+
+See [`docs/operations.md`](docs/operations.md) for install / uninstall /
+backup / migrate / troubleshooting. See
+[`docs/SETUP.md`](docs/SETUP.md) for the fresh-Mac install walkthrough.
 
 **👉 New to this project? See [`docs/SETUP.md`](docs/SETUP.md) for the
 complete fresh-Mac setup guide (Docker, Python, Immich, Anthropic key,
@@ -260,7 +263,39 @@ expose it on the LAN, add HTTP Basic auth first (out of scope here).
 make smoke-dashboard      # hits /healthz, prints OK
 ```
 
+## Operations
+
+The worker and dashboard run permanently as macOS launchd services. A
+backup job runs nightly at 03:00.
+
+```bash
+make install-launchd    # one-time, after make bootstrap
+make logs               # tail all service logs
+make backup-now         # ad-hoc backup
+make uninstall-launchd  # stop & remove the services
+```
+
+Full procedures (including new-Mac migration and restoring from a backup)
+are in [`docs/operations.md`](docs/operations.md).
+
 ## Project layout
+
+```
+home/
+├── src/home_photo_repo/   # main package (see breakdown below)
+├── migrations/             # forward-only .sql files
+├── docker/immich/          # Immich Docker Compose config
+├── scripts/                # smoke tests, backup, one-shot tools
+├── launchd/                # ← Plan 5
+│   ├── com.homephoto.worker.plist.template
+│   ├── com.homephoto.dashboard.plist.template
+│   ├── com.homephoto.backup.plist.template
+│   ├── com.homephoto.mlx.plist.template     # optional
+│   ├── install_launchd.py
+│   └── uninstall_launchd.py
+├── tests/                  # pytest suite, no network
+└── docs/                   # spec, plans, SETUP.md, operations.md
+```
 
 ```
 src/home_photo_repo/
@@ -289,11 +324,6 @@ src/home_photo_repo/
 │   └── static/               # vendored Leaflet + HTMX + CSS
 └── worker/
     └── … (unchanged)
-
-migrations/              # forward-only .sql files
-docker/immich/           # Immich docker compose config
-scripts/                 # smoke tests, one-shot tools
-tests/                   # pytest suite, no network
 ```
 
 ## Roadmap (subsequent plans)
@@ -304,5 +334,6 @@ tests/                   # pytest suite, no network
   for venue resolution.
 - **Plan 4** ✅ Done — FastAPI + HTMX + Leaflet dashboard at
   `localhost:8000`.
-- **Plan 5** — Operations: launchd plists, nightly pg_dumpall, MLX
-  setup, migration to a new Mac.
+- **Plan 5** ✅ Done — launchd plists (auto-start at login), nightly
+  `pg_dumpall` backup, `bootstrap-existing` for new-Mac migration,
+  optional MLX server.
