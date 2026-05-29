@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.homephoto.mlx</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{UV}}</string>
+        <string>run</string>
+        <string>--with</string>
+        <string>mlx-vlm</string>
+        <string>python</string>
+        <string>-m</string>
+        <string>mlx_vlm.server</string>
+        <string>--model</string>
+        <string>mlx-community/Qwen2-VL-2B-Instruct-4bit</string>
+        <string>--port</string>
+        <string>8081</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{REPO_ROOT}}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>120</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{LOG_DIR}}/mlx.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{LOG_DIR}}/mlx.err.log</string>
+</dict>
+</plist>

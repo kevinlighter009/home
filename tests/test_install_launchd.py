@@ -92,3 +92,18 @@ def test_backup_template_substitutes_to_valid_xml(tmp_path: Path) -> None:
     result = subprocess.run(["plutil", "-lint", str(out)],
                             capture_output=True, text=True)
     assert result.returncode == 0, f"plutil rejected the plist: {result.stderr}"
+
+
+def test_mlx_template_substitutes_to_valid_xml(tmp_path: Path) -> None:
+    from launchd.install_launchd import default_context, substitute
+
+    template_path = LAUNCHD_DIR / "com.homephoto.mlx.plist.template"
+    if not template_path.exists():
+        pytest.skip("mlx template not present (optional, Task 7)")
+    rendered = substitute(template_path.read_text(),
+                          default_context(repo_root=REPO_ROOT))
+    out = tmp_path / "out.plist"
+    out.write_text(rendered)
+    result = subprocess.run(["plutil", "-lint", str(out)],
+                            capture_output=True, text=True)
+    assert result.returncode == 0, f"plutil rejected: {result.stderr}"
