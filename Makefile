@@ -1,7 +1,11 @@
-.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor
+.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor start-mlx
 
 PYTHON := uv run python
 PYTEST := uv run pytest
+
+# Model weights live on the SSD so they travel with the data.
+# All make targets (worker, dashboard, smoke tests) inherit this.
+export HF_HOME := /Volumes/PhotoSSD/mlx_models
 
 bootstrap:
 	@if [ -f .env ]; then \
@@ -109,6 +113,12 @@ install-mlx:
 
 smoke-mlx:
 	$(PYTHON) scripts/smoke_mlx.py
+
+start-mlx:
+	@echo "HF_HOME=$(HF_HOME)"
+	uv run mlx_vlm.server \
+		--model mlx-community/Qwen2.5-VL-7B-Instruct-4bit \
+		--port 8081
 
 monitor: ensure-db
 	$(PYTHON) scripts/monitor_processing.py
