@@ -21,7 +21,7 @@ class PlacesRepository:
         now = datetime.now(tz=UTC).isoformat()
         self._conn.execute(
             """
-            INSERT INTO places (
+            INSERT OR IGNORE INTO places (
                 id, name, type, latitude, longitude, radius_m,
                 google_place_id, address, created_at, updated_at, notes
             )
