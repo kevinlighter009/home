@@ -25,7 +25,9 @@ def test_settings_applies_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
     from home_photo_repo.config import Settings
 
-    s = Settings()
+    # Pass _env_file=None so the real .env on disk (which may have dev overrides
+    # like POLL_INTERVAL_SECONDS=30) doesn't interfere with default assertions.
+    s = Settings(_env_file=None)
     assert s.poll_interval_seconds == 300
     assert s.backfill_batch_size == 100
     assert s.stage_a_food_threshold == 0.6

@@ -30,6 +30,7 @@ def test_initial_migration_creates_all_tables(tmp_path: Path) -> None:
         "places",
         "worker_runs",
         "worker_state",
+        "immich_users",       # added by migration 004
     }
 
 
