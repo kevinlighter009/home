@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor start-mlx digest digest-dry configure-tailscale
+.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor start-mlx digest digest-dry configure-tailscale install-nginx uninstall-nginx
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -108,6 +108,12 @@ bootstrap-existing:
 
 configure-tailscale:
 	$(PYTHON) scripts/configure_tailscale.py
+
+install-nginx:
+	$(PYTHON) scripts/install_nginx.py
+
+uninstall-nginx:
+	$(PYTHON) scripts/install_nginx.py --uninstall
 
 install-mlx:
 	@echo "Installing mlx-vlm (Apple Silicon required)..."

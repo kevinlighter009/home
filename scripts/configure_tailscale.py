@@ -41,7 +41,7 @@ import sys
 from pathlib import Path
 
 DEFAULT_PORT = 8000
-DEFAULT_LOCAL_NAME = "home-photo"
+DEFAULT_LOCAL_NAME = "home-food"
 DASHBOARD_KEY = "DASHBOARD_BIND"
 
 _TAILSCALE_PATHS = [
@@ -214,8 +214,9 @@ def main() -> int:
     print("  [1/2] mDNS (home WiFi — no software needed on viewing devices)")
     bonjour_name = _ensure_bonjour_name(args.local_name)
     if bonjour_name:
-        local_url = f"http://{bonjour_name}.local:{port}"
-        print(f"        ✅  http://{bonjour_name}.local:{port}")
+        local_url = f"http://{bonjour_name}.local"
+        print(f"        ✅  http://{bonjour_name}.local  (via nginx on port 80)")
+        print(f"             Fallback (no nginx): http://{bonjour_name}.local:{port}")
     else:
         lan_ip = _local_lan_ip()
         local_url = f"http://{lan_ip}:{port}" if lan_ip else f"http://<mac-ip>:{port}"
