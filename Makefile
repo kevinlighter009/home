@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx
+.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -109,3 +109,6 @@ install-mlx:
 
 smoke-mlx:
 	$(PYTHON) scripts/smoke_mlx.py
+
+monitor: ensure-db
+	$(PYTHON) scripts/monitor_processing.py
