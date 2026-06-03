@@ -202,65 +202,74 @@ def run_venue_backfill_batch(
 
     # ── Phase 2: concurrent Google calls for cache misses ──────────────────
     if google_needed and google_client is not None:
-        # Check budget and submit HTTP calls concurrently.
-        future_to_photo: dict = {}
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            for photo in google_needed:
-                if not budget.check_and_consume(conn):
-                    # Budget exhausted mid-batch — mark and skip remaining.
-                    retry_after = budget.next_month_start().isoformat()
-                    conn.execute(
-                        "UPDATE photo_analysis SET venue_retry_after = ? "
-                        "WHERE immich_asset_id = ?",
-                        (retry_after, photo["id"]),
-                    )
-                    summary.budget_skipped += 1
-                    log.warning(
-                        "google_places budget exhausted — %d photos deferred to next month",
-                        len(google_needed) - len(future_to_photo) - summary.budget_skipped,
-                    )
-                    # Skip remaining google_needed photos too.
-                    for remaining in google_needed[
-                        google_needed.index(photo) + 1:
-                    ]:
-                        conn.execute(
-                            "UPDATE photo_analysis SET venue_retry_after = ? "
-                            "WHERE immich_asset_id = ?",
-                            (retry_after, remaining["id"]),
-                        )
-                        summary.budget_skipped += 1
-                    break
+        # Deduplicate by rounded GPS (4 decimal places ≈ 11 m grid).
+        # ONE Google API call per unique coordinate; result applied to ALL
+        # photos at that location — this is the key efficiency fix that
+        # prevents burning N budget units for N photos at the same restaurant.
+        coord_to_photos: dict[tuple[float, float], list[dict]] = {}
+        for photo in google_needed:
+            key = (round(photo["lat"], 4), round(photo["lng"], 4))
+            coord_to_photos.setdefault(key, []).append(photo)
 
+        unique_coords = list(coord_to_photos.items())  # [(coord_key, [photos…]), …]
+        retry_after_str = budget.next_month_start().isoformat()
+        future_to_coord: dict = {}
+        exhausted_from_idx: int | None = None
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for i, (coord_key, _photos) in enumerate(unique_coords):
+                if not budget.check_and_consume(conn):
+                    exhausted_from_idx = i
+                    break
+                lat, lng = coord_key
                 future = pool.submit(
-                    _google_fetch,
-                    google_client,
-                    photo["lat"],
-                    photo["lng"],
+                    _google_fetch, google_client, lat, lng,
                     place_matcher.search_radius_m,
                 )
-                future_to_photo[future] = photo
+                future_to_coord[future] = (coord_key, coord_to_photos[coord_key])
 
-        # ── Phase 3: rank + cache results on main thread (serialised DB) ──
-        for future, photo in future_to_photo.items():
+        # Defer any coordinates that didn't get a budget slot.
+        if exhausted_from_idx is not None:
+            deferred = [
+                p
+                for _, photos in unique_coords[exhausted_from_idx:]
+                for p in photos
+            ]
+            for photo in deferred:
+                conn.execute(
+                    "UPDATE photo_analysis SET venue_retry_after = ? "
+                    "WHERE immich_asset_id = ?",
+                    (retry_after_str, photo["id"]),
+                )
+            summary.budget_skipped += len(deferred)
+            log.warning(
+                "google_places budget exhausted — %d photos deferred to next month",
+                len(deferred),
+            )
+
+        # ── Phase 3: rank + cache + write ALL photos per coordinate ────────
+        for future, (coord_key, photos) in future_to_coord.items():
+            lat, lng = coord_key
             try:
                 candidates = future.result()
                 summary.google_calls += 1
             except Exception as exc:  # noqa: BLE001
-                log.error("google lookup failed for %s: %s", photo["id"], exc)
-                summary.errors += 1
+                log.error("google lookup failed for coord %s: %s", coord_key, exc)
+                summary.errors += len(photos)
                 continue
 
             match = place_matcher.match_from_candidates(
-                latitude=photo["lat"],
-                longitude=photo["lng"],
+                latitude=lat,
+                longitude=lng,
                 candidates=candidates,
             )
-            _write_result(conn, photo["id"], match, now, budget)
-
-            if match.source == "google_places":
-                summary.resolved += 1
-            else:
-                summary.google_miss += 1
+            # Apply the single match result to every photo at this coordinate.
+            for photo in photos:
+                _write_result(conn, photo["id"], match, now, budget)
+                if match.source == "google_places":
+                    summary.resolved += 1
+                else:
+                    summary.google_miss += 1
 
     elif google_client is None:
         # No Google key — mark all as retry next month.
