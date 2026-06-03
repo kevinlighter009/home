@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor start-mlx digest digest-dry
+.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor start-mlx digest digest-dry configure-tailscale
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -27,6 +27,10 @@ bootstrap:
 	mkdir -p $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/db
 	mkdir -p $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/logs
 	$(PYTHON) -m home_photo_repo.db migrate
+	@echo ""
+	@echo "--- Configuring Tailscale for dashboard access ---"
+	$(PYTHON) scripts/configure_tailscale.py || true
+	@echo ""
 	@echo "Bootstrap complete."
 
 ensure-db:
@@ -96,7 +100,14 @@ bootstrap-existing:
 	fi
 	mkdir -p $${SSD_DATA_DIR:-$$HOME/home_photo_repo_data}/logs
 	$(PYTHON) -m home_photo_repo.db migrate
+	@echo ""
+	@echo "--- Configuring Tailscale for dashboard access ---"
+	$(PYTHON) scripts/configure_tailscale.py || true
+	@echo ""
 	@echo "bootstrap-existing complete — DB is present, deps installed, migrations applied."
+
+configure-tailscale:
+	$(PYTHON) scripts/configure_tailscale.py
 
 install-mlx:
 	@echo "Installing mlx-vlm (Apple Silicon required)..."
