@@ -289,6 +289,50 @@ expose it on the LAN, add HTTP Basic auth first (out of scope here).
 make smoke-dashboard      # hits /healthz, prints OK
 ```
 
+## Restarting the stack
+
+All code, data, and model weights live on the SSD at `/Volumes/PhotoSSD/`.
+Plug in the SSD, open four terminals, and run:
+
+```bash
+# 0 — always start here
+cd /Volumes/PhotoSSD/repo
+```
+
+```bash
+# Terminal 1 — Immich (Docker)
+cd docker/immich && docker compose up -d && cd ../..
+```
+
+```bash
+# Terminal 2 — MLX vision model server (HF_HOME set automatically by Makefile)
+make start-mlx
+```
+
+```bash
+# Terminal 3 — Worker (ingests + classifies photos)
+make dev-worker
+```
+
+```bash
+# Terminal 4 — Dashboard  http://127.0.0.1:8000
+make dev-dashboard
+```
+
+```bash
+# Optional — live processing progress
+make monitor
+```
+
+To shut everything down:
+
+```bash
+# Worker / dashboard / MLX server: Ctrl-C in their respective terminals
+
+# Immich:
+cd /Volumes/PhotoSSD/repo/docker/immich && docker compose down
+```
+
 ## Operations
 
 The worker and dashboard run permanently as macOS launchd services. A
