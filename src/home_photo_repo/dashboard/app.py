@@ -34,6 +34,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     from home_photo_repo.dashboard.routes import (
+        book,
         feed,
         map_view,
         place,
@@ -42,7 +43,7 @@ def create_app(
         review,
         status,
     )
-    for module in (proxy, map_view, place, feed, review, places_editor, status):
+    for module in (proxy, map_view, place, feed, review, places_editor, status, book):
         app.include_router(module.router)
 
     @app.get("/healthz")

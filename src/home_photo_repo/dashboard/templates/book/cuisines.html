@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Cuisines — Food Memory Book{% endblock %}
+{% block content %}
+{% set book_tab = 'cuisines' %}
+{% include "book/_subnav.html" %}
+
+<div class="card">
+  <h2 style="margin: 0 0 4px;">{{ cuisines | length }} cuisines explored</h2>
+  <p style="color: var(--muted); margin: 0 0 16px; font-size: 13px;">
+    Click any cuisine to browse its photos.
+  </p>
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">
+    {% for c in cuisines %}
+      <a href="/book/cuisine/{{ c.cuisine | urlencode }}"
+         style="display: block; border: 1px solid var(--border); border-radius: 8px;
+                background: var(--card); text-decoration: none; color: var(--text);
+                overflow: hidden; transition: box-shadow .15s;">
+        {% if c.sample_id %}
+          <img src="/proxy/thumbnail/{{ c.sample_id }}"
+               style="width: 100%; height: 120px; object-fit: cover; display: block;" loading="lazy" />
+        {% else %}
+          <div style="width:100%; height:120px; background:var(--bg); display:flex;
+                      align-items:center; justify-content:center; font-size:36px;">🍽️</div>
+        {% endif %}
+        <div style="padding: 10px 12px;">
+          <div style="font-weight: 600; font-size: 15px;">{{ c.cuisine }}</div>
+          <div style="color: var(--muted); font-size: 12px; margin-top: 4px;">
+            {{ c.meal_count }} photo{{ 's' if c.meal_count != 1 else '' }}
+            · {{ c.venue_count }} venue{{ 's' if c.venue_count != 1 else '' }}
+            · {{ c.user_count }} person{{ 's' if c.user_count != 1 else '' }}
+          </div>
+          {% if c.first_eaten %}
+          <div style="color: var(--muted); font-size: 11px; margin-top: 2px;">
+            First: {{ c.first_eaten[:10] }}
+            {% if c.last_eaten and c.last_eaten[:10] != c.first_eaten[:10] %}
+              · Latest: {{ c.last_eaten[:10] }}
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </a>
+    {% else %}
+      <div class="card" style="grid-column: 1 / -1; color: var(--muted);">
+        No cuisines classified yet. Run the worker to process photos.
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

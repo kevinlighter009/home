@@ -48,6 +48,16 @@ button { background: var(--accent); color: white; border: none; cursor: pointer;
 button.danger { background: #dc2626; }
 button:hover { opacity: 0.92; }
 #map { height: calc(100vh - 130px); border-radius: 8px; }
+.subnav {
+  display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.subnav a {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+  text-decoration: none; color: var(--muted); background: var(--card); font-size: 13px;
+}
+.subnav a:hover, .subnav a.active {
+  background: var(--accent); color: white; border-color: var(--accent);
+}
 .pagination { display: flex; gap: 8px; margin-top: 16px; }
 .pagination a {
   padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px;

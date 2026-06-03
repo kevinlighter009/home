@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     anthropic_rate_limit_per_minute: int = 30
     dashboard_bind: str = "127.0.0.1:8000"
 
+    # Weekly email digest
+    digest_enabled: bool = False
+    digest_from_email: str = ""            # Gmail address to send from
+    digest_app_password: SecretStr = SecretStr("")  # Gmail App Password
+    digest_to_emails: str = ""             # comma-separated recipient list
+
     # LLM provider selection
     llm_stage_a_provider: str = "mlx"
     llm_stage_a_model: str = "claude-haiku-4-5"

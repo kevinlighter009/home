@@ -1,0 +1,8 @@
+{# Shared sub-navigation for all /book/* pages #}
+<nav class="subnav">
+  <a href="/book"           class="{% if book_tab == 'overview'  %}active{% endif %}">Overview</a>
+  <a href="/book/cuisines"  class="{% if book_tab == 'cuisines'  %}active{% endif %}">Cuisines</a>
+  <a href="/book/timeline"  class="{% if book_tab == 'timeline'  %}active{% endif %}">Timeline</a>
+  <a href="/book/together"  class="{% if book_tab == 'together'  %}active{% endif %}">Together</a>
+  <a href="/book/stats"     class="{% if book_tab == 'stats'     %}active{% endif %}">Stats</a>
+</nav>

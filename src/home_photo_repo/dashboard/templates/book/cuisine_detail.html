@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ cuisine_name }} — Food Memory Book{% endblock %}
+{% block content %}
+{% set book_tab = 'cuisines' %}
+{% include "book/_subnav.html" %}
+
+<div class="card" style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;">
+  <div>
+    <a href="/book/cuisines" style="color: var(--muted); text-decoration: none; font-size: 13px;">← All cuisines</a>
+    <h2 style="margin: 4px 0 0;">{{ cuisine_name }}</h2>
+  </div>
+  <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+    <div style="text-align: center;">
+      <div style="font-size: 22px; font-weight: 700;">{{ total }}</div>
+      <div style="color: var(--muted); font-size: 11px;">photos</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 22px; font-weight: 700;">{{ stats.venues or 0 }}</div>
+      <div style="color: var(--muted); font-size: 11px;">venues</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 22px; font-weight: 700;">{{ stats.users or 0 }}</div>
+      <div style="color: var(--muted); font-size: 11px;">people</div>
+    </div>
+    {% if stats.first %}
+    <div style="text-align: center;">
+      <div style="font-size: 14px; font-weight: 600; padding-top: 4px;">{{ stats.first[:10] }}</div>
+      <div style="color: var(--muted); font-size: 11px;">first eaten</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid">
+  {% for p in photos %}
+    <div class="photo-card">
+      <img src="/proxy/thumbnail/{{ p.immich_asset_id }}" alt="{{ p.dish_name }}" loading="lazy" />
+      <div class="meta">
+        <div class="dish">{{ p.dish_name or '(unclassified)' }}</div>
+        <div class="venue">
+          {% if p.venue_name %}{{ p.venue_name }}{% endif %}
+        </div>
+        <div style="color: var(--muted); font-size: 11px;">
+          {{ p.user_name or '' }}
+          {% if p.taken_at %} · {{ p.taken_at[:10] }}{% endif %}
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card" style="grid-column: 1 / -1; color: var(--muted);">No photos found.</div>
+  {% endfor %}
+</div>
+
+<div class="pagination">
+  <a href="?page={{ page - 1 }}" class="{% if page <= 1 %}disabled{% endif %}">← Previous</a>
+  <span style="padding: 6px 12px; color: var(--muted);">Page {{ page }} / {{ total_pages }}</span>
+  <a href="?page={{ page + 1 }}" class="{% if page >= total_pages %}disabled{% endif %}">Next →</a>
+</div>
+{% endblock %}

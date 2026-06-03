@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Together — Food Memory Book{% endblock %}
+{% block content %}
+{% set book_tab = 'together' %}
+{% include "book/_subnav.html" %}
+
+{# --- Lifetime stats strip --- #}
+<div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px;">
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Shared meals</div>
+    <div style="font-size: 26px; font-weight: 700;">{{ lifetime.total_shared or 0 }}</div>
+  </div>
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Shared venues</div>
+    <div style="font-size: 26px; font-weight: 700;">{{ lifetime.shared_venues or 0 }}</div>
+  </div>
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Days together</div>
+    <div style="font-size: 26px; font-weight: 700;">{{ lifetime.shared_days or 0 }}</div>
+  </div>
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Current streak</div>
+    <div style="font-size: 26px; font-weight: 700;">{{ streaks.current }}
+      <span style="font-size: 13px; font-weight: 400; color: var(--muted);">wk</span>
+    </div>
+  </div>
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Longest streak</div>
+    <div style="font-size: 26px; font-weight: 700;">{{ streaks.longest }}
+      <span style="font-size: 13px; font-weight: 400; color: var(--muted);">wk</span>
+    </div>
+  </div>
+</div>
+
+{# --- Shared meals timeline --- #}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Shared meals ({{ total_shared }} total)</h2>
+
+  {% if shared_meals %}
+    {% for meal in shared_meals %}
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
+                  margin-bottom: 12px; background: var(--bg);">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+          <div>
+            <span style="font-weight: 600; font-size: 15px;">
+              {{ meal.venue_name or '(unnamed venue)' }}
+            </span>
+            {% if meal.venue_type %}
+              <span style="color: var(--muted); font-size: 12px; margin-left: 6px;">
+                {{ meal.venue_type }}
+              </span>
+            {% endif %}
+          </div>
+          <div style="color: var(--muted); font-size: 13px;">{{ meal.meal_date }}</div>
+        </div>
+
+        {# One photo per user #}
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          {% for up in meal.user_photos %}
+            <div style="text-align: center;">
+              <img src="/proxy/thumbnail/{{ up.immich_asset_id }}"
+                   style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px;
+                          border: 1px solid var(--border);" loading="lazy" />
+              <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">
+                {{ up.user_name or 'user' }}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div style="margin-top: 6px; font-size: 12px; color: var(--muted);">
+          {{ meal.photo_count }} photo{{ 's' if meal.photo_count != 1 else '' }} ·
+          {{ meal.user_count }} people
+          {% if meal.address %} · {{ meal.address }}{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p style="color: var(--muted);">
+      No shared meals found yet. Shared meals require ≥2 family members photographing food
+      at the same venue on the same day.
+    </p>
+  {% endif %}
+
+  <div class="pagination" style="margin-top: 8px;">
+    <a href="?page={{ page - 1 }}" class="{% if page <= 1 %}disabled{% endif %}">← Previous</a>
+    <span style="padding: 6px 12px; color: var(--muted);">Page {{ page }} / {{ total_pages }}</span>
+    <a href="?page={{ page + 1 }}" class="{% if page >= total_pages %}disabled{% endif %}">Next →</a>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+  {# --- Top shared venues --- #}
+  <div class="card">
+    <h2 style="margin: 0 0 12px;">Top spots together</h2>
+    {% if top_shared_venues %}
+      <table>
+        <thead>
+          <tr><th>Venue</th><th>Type</th><th style="text-align:right;">Visits</th></tr>
+        </thead>
+        <tbody>
+          {% for v in top_shared_venues %}
+            <tr>
+              <td>{{ v.name }}</td>
+              <td style="color: var(--muted);">{{ v.type or '—' }}</td>
+              <td style="text-align: right;">{{ v.times }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p style="color: var(--muted);">No data yet.</p>
+    {% endif %}
+  </div>
+
+  {# --- First times together --- #}
+  <div class="card">
+    <h2 style="margin: 0 0 12px;">First times together</h2>
+    {% if first_times %}
+      <table>
+        <thead>
+          <tr><th>Venue</th><th>First visit</th><th style="text-align:right;">Visits</th></tr>
+        </thead>
+        <tbody>
+          {% for ft in first_times %}
+            <tr>
+              <td>{{ ft.name }}</td>
+              <td style="color: var(--muted);">{{ ft.first_date }}</td>
+              <td style="text-align: right;">{{ ft.total_visits }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p style="color: var(--muted);">No data yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

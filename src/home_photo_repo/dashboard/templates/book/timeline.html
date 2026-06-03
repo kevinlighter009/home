@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Timeline — Food Memory Book{% endblock %}
+{% block content %}
+{% set book_tab = 'timeline' %}
+{% include "book/_subnav.html" %}
+
+{% for week in weeks %}
+<div class="card" style="margin-bottom: 20px;">
+  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
+    <div>
+      <h2 style="margin: 0; font-size: 16px;">{{ week.label }}</h2>
+      <div style="color: var(--muted); font-size: 12px; margin-top: 2px;">
+        {{ week.meal_count }} photo{{ 's' if week.meal_count != 1 else '' }}
+        · {{ week.venue_count }} venue{{ 's' if week.venue_count != 1 else '' }}
+        · {{ week.user_count }} person{{ 's' if week.user_count != 1 else '' }}
+      </div>
+    </div>
+    {% if week.cuisines %}
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        {% for c in week.cuisines %}
+          {% if c %}
+          <span style="padding: 2px 10px; background: var(--bg); border: 1px solid var(--border);
+                       border-radius: 12px; font-size: 11px; color: var(--muted);">{{ c }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  {# Up to 6 sample photos #}
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;">
+    {% for p in week.photos %}
+      <div class="photo-card">
+        <img src="/proxy/thumbnail/{{ p.immich_asset_id }}" alt="{{ p.dish_name }}" loading="lazy"
+             style="height: 120px;" />
+        <div class="meta" style="font-size: 11px;">
+          <div class="dish">{{ p.dish_name or '(unclassified)' }}</div>
+          <div class="venue">
+            {% if p.venue_name %}{{ p.venue_name }}{% endif %}
+          </div>
+          <div style="color: var(--muted);">{{ p.user_name or '' }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+  <div class="card" style="color: var(--muted);">No food photos found.</div>
+{% endfor %}
+
+<div class="pagination">
+  <a href="?page={{ page - 1 }}" class="{% if page <= 1 %}disabled{% endif %}">← Previous</a>
+  <span style="padding: 6px 12px; color: var(--muted);">Page {{ page }} / {{ total_pages }}</span>
+  <a href="?page={{ page + 1 }}" class="{% if page >= total_pages %}disabled{% endif %}">Next →</a>
+</div>
+{% endblock %}

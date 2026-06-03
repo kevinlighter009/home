@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Stats — Food Memory Book{% endblock %}
+{% block content %}
+{% set book_tab = 'stats' %}
+{% include "book/_subnav.html" %}
+
+{# --- Per-user totals --- #}
+{% if per_user %}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Per-person summary</h2>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+    {% for u in per_user %}
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 14px; background: var(--bg);">
+        <div style="font-weight: 600; font-size: 15px; margin-bottom: 8px;">{{ u.name or 'Unknown' }}</div>
+        <div style="display: flex; gap: 16px;">
+          <div>
+            <div style="font-size: 20px; font-weight: 700;">{{ u.meals }}</div>
+            <div style="color: var(--muted); font-size: 11px;">photos</div>
+          </div>
+          <div>
+            <div style="font-size: 20px; font-weight: 700;">{{ u.cuisines }}</div>
+            <div style="color: var(--muted); font-size: 11px;">cuisines</div>
+          </div>
+          <div>
+            <div style="font-size: 20px; font-weight: 700;">{{ u.venues }}</div>
+            <div style="color: var(--muted); font-size: 11px;">venues</div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# --- Weekly sparkline (last 16 weeks) --- #}
+{% if weekly %}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Weekly activity (last 16 weeks)</h2>
+  {% set max_cnt = weekly | map(attribute='cnt') | max %}
+  <div style="display: flex; align-items: flex-end; gap: 4px; height: 60px;">
+    {% for w in weekly %}
+      {% set bar_h = ((w.cnt / max_cnt) * 56) | int %}
+      <div title="{{ w.wk }}: {{ w.cnt }} photos"
+           style="flex: 1; background: var(--accent); border-radius: 2px 2px 0 0;
+                  height: {{ bar_h }}px; min-height: 4px; opacity: 0.7;
+                  transition: opacity .15s; cursor: default;"
+           onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.7'">
+      </div>
+    {% endfor %}
+  </div>
+  <div style="display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 4px;">
+    <span>{{ weekly[0].wk }}</span>
+    <span>{{ weekly[-1].wk }}</span>
+  </div>
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+  {# --- Cuisine breakdown bar chart --- #}
+  <div class="card">
+    <h2 style="margin: 0 0 12px;">Cuisine breakdown</h2>
+    {% for c in cuisines %}
+      {% set bar_w = ((c.cnt / cuisine_max) * 100) | int %}
+      <div style="margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+          <a href="/book/cuisine/{{ c.cuisine | urlencode }}"
+             style="color: var(--text); text-decoration: none;">{{ c.cuisine }}</a>
+          <span style="color: var(--muted);">{{ c.cnt }}</span>
+        </div>
+        <div style="background: var(--bg); border-radius: 4px; height: 6px; overflow: hidden;">
+          <div style="width: {{ bar_w }}%; background: var(--accent); height: 100%; border-radius: 4px;"></div>
+        </div>
+      </div>
+    {% else %}
+      <p style="color: var(--muted);">No data yet.</p>
+    {% endfor %}
+  </div>
+
+  {# --- Top venues --- #}
+  <div class="card">
+    <h2 style="margin: 0 0 12px;">Top venues</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Venue</th>
+          <th style="text-align:right;">Photos</th>
+          <th style="text-align:right;">Days</th>
+          <th>Last visit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in top_venues %}
+          <tr>
+            <td>
+              <div style="font-weight: 500;">{{ v.name }}</div>
+              <div style="color: var(--muted); font-size: 11px;">{{ v.type or '' }}</div>
+            </td>
+            <td style="text-align: right;">{{ v.total_photos }}</td>
+            <td style="text-align: right;">{{ v.days_visited }}</td>
+            <td style="color: var(--muted); font-size: 12px;">{{ v.last_visit[:10] if v.last_visit else '—' }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" style="color: var(--muted);">No venue data yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# --- Top dishes --- #}
+{% if top_dishes %}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Top dishes</h2>
+  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+    {% for d in top_dishes %}
+      <span style="padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+                   background: var(--bg); font-size: 13px;">
+        {{ d.dish_name }}
+        <span style="color: var(--muted);">× {{ d.cnt }}</span>
+      </span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

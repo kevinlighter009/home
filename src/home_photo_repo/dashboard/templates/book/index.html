@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Food Memory Book — home_photo_repo{% endblock %}
+{% block content %}
+{% set book_tab = 'overview' %}
+{% include "book/_subnav.html" %}
+
+{# --- Hero stats --- #}
+<div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Total food photos</div>
+    <div style="font-size: 28px; font-weight: 700;">{{ totals.total_meals or 0 }}</div>
+  </div>
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Venues visited</div>
+    <div style="font-size: 28px; font-weight: 700;">{{ totals.total_venues or 0 }}</div>
+  </div>
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Cuisines explored</div>
+    <div style="font-size: 28px; font-weight: 700;">{{ totals.total_cuisines or 0 }}</div>
+  </div>
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Shared meals</div>
+    <div style="font-size: 28px; font-weight: 700;">{{ shared_count or 0 }}</div>
+  </div>
+  {% if totals.first_meal %}
+  <div>
+    <div style="color: var(--muted); font-size: 12px;">Eating together since</div>
+    <div style="font-size: 15px; font-weight: 600; padding-top: 6px;">{{ totals.first_meal[:10] }}</div>
+  </div>
+  {% endif %}
+</div>
+
+{# --- Top cuisines quick strip --- #}
+{% if top_cuisines %}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">Top cuisines</h2>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    {% for c in top_cuisines %}
+      <a href="/book/cuisine/{{ c.cuisine | urlencode }}"
+         style="padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+                text-decoration: none; color: var(--text); background: var(--bg);">
+        {{ c.cuisine }} <span style="color: var(--muted); font-size: 12px;">({{ c.cnt }})</span>
+      </a>
+    {% endfor %}
+    <a href="/book/cuisines" style="padding: 6px 14px; color: var(--accent); text-decoration: none;">
+      See all →
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# --- Recent meals (last 7 days) --- #}
+<div class="card">
+  <h2 style="margin: 0 0 12px;">This week's meals</h2>
+  {% if recent %}
+    <div class="grid">
+      {% for p in recent %}
+        <div class="photo-card">
+          <img src="/proxy/thumbnail/{{ p.immich_asset_id }}" alt="{{ p.dish_name }}" loading="lazy" />
+          <div class="meta">
+            <div class="dish">{{ p.dish_name or '(unclassified)' }}</div>
+            <div class="venue">
+              {{ p.cuisine or '' }}
+              {% if p.venue_name %} · {{ p.venue_name }}{% endif %}
+            </div>
+            <div style="color: var(--muted); font-size: 11px;">
+              {{ p.user_name or '' }}
+              {% if p.taken_at %} · {{ p.taken_at[:10] }}{% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <div style="margin-top: 12px;">
+      <a href="/book/timeline" style="color: var(--accent); text-decoration: none; font-size: 13px;">
+        View full timeline →
+      </a>
+    </div>
+  {% else %}
+    <p style="color: var(--muted);">No food photos in the last 7 days.</p>
+  {% endif %}
+</div>
+{% endblock %}
