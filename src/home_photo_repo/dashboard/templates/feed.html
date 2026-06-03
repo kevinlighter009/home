@@ -1,15 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Feed — home_photo_repo{% endblock %}
 {% block content %}
-<div class="card" style="display: flex; justify-content: space-between; align-items: center;">
-  <h2 style="margin: 0;">Recent food photos ({{ total }})</h2>
-  <form method="get" action="/feed" style="margin: 0;">
+<div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+  <h2 style="margin: 0;">Food photos ({{ total }})</h2>
+  <form method="get" action="/feed" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0;">
+    {% if users|length > 1 %}
+    <select name="user_id" onchange="this.form.submit()">
+      <option value="" {% if not user_filter %}selected{% endif %}>All users</option>
+      {% for u in users %}
+        <option value="{{ u.user_id }}" {% if user_filter == u.user_id %}selected{% endif %}>
+          {{ u.display_name or u.username }}
+        </option>
+      {% endfor %}
+    </select>
+    {% elif user_filter %}
+      <input type="hidden" name="user_id" value="{{ user_filter }}" />
+    {% endif %}
     <select name="venue_type" onchange="this.form.submit()">
       <option value="" {% if not venue_filter %}selected{% endif %}>All venues</option>
       {% for vt in valid_venue_types %}
         <option value="{{ vt }}" {% if venue_filter == vt %}selected{% endif %}>{{ vt }}</option>
       {% endfor %}
     </select>
+    {% if user_filter or venue_filter %}
+      <a href="/feed" style="align-self: center; font-size: 13px; color: var(--muted);">✕ clear</a>
+    {% endif %}
   </form>
 </div>
 
@@ -37,10 +52,10 @@
 </div>
 
 <div class="pagination">
-  <a href="?page={{ page - 1 }}{% if venue_filter %}&venue_type={{ venue_filter }}{% endif %}"
+  <a href="?page={{ page - 1 }}{% if venue_filter %}&venue_type={{ venue_filter }}{% endif %}{% if user_filter %}&user_id={{ user_filter }}{% endif %}"
      class="{% if not has_prev %}disabled{% endif %}">← Previous</a>
   <span style="padding: 6px 12px; color: var(--muted);">Page {{ page }}</span>
-  <a href="?page={{ page + 1 }}{% if venue_filter %}&venue_type={{ venue_filter }}{% endif %}"
+  <a href="?page={{ page + 1 }}{% if venue_filter %}&venue_type={{ venue_filter }}{% endif %}{% if user_filter %}&user_id={{ user_filter }}{% endif %}"
      class="{% if not has_next %}disabled{% endif %}">Next →</a>
 </div>
 {% endblock %}

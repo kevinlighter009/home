@@ -18,45 +18,41 @@ def feed(
     request: Request,
     page: int = 1,
     venue_type: str | None = None,
+    user_id: str | None = None,
 ) -> HTMLResponse:
     deps = request.app.state.deps
     page = max(1, page)
     offset = (page - 1) * _PAGE_SIZE
 
-    has_filter = bool(venue_type)
+    # Build WHERE clause dynamically from active filters.
+    conditions = ["stage_a_is_food = 1"]
+    params: list[object] = []
+    if venue_type:
+        conditions.append("venue_type = ?")
+        params.append(venue_type)
+    if user_id:
+        conditions.append("uploader_user_id = ?")
+        params.append(user_id)
+    where = " AND ".join(conditions)
+
     with deps.db_conn() as conn:
-        if has_filter:
-            total = conn.execute(
-                "SELECT COUNT(*) FROM photo_analysis "
-                "WHERE stage_a_is_food = 1 AND venue_type = ?",
-                (venue_type,),
-            ).fetchone()[0]
-            rows = conn.execute(
-                """
-                SELECT immich_asset_id, dish_name, cuisine, taken_at,
-                       venue_type, place_id, review_status
-                  FROM photo_analysis
-                 WHERE stage_a_is_food = 1 AND venue_type = ?
-              ORDER BY taken_at DESC NULLS LAST
-                 LIMIT ? OFFSET ?
-                """,
-                (venue_type, _PAGE_SIZE, offset),
-            ).fetchall()
-        else:
-            total = conn.execute(
-                "SELECT COUNT(*) FROM photo_analysis WHERE stage_a_is_food = 1"
-            ).fetchone()[0]
-            rows = conn.execute(
-                """
-                SELECT immich_asset_id, dish_name, cuisine, taken_at,
-                       venue_type, place_id, review_status
-                  FROM photo_analysis
-                 WHERE stage_a_is_food = 1
-              ORDER BY taken_at DESC NULLS LAST
-                 LIMIT ? OFFSET ?
-                """,
-                (_PAGE_SIZE, offset),
-            ).fetchall()
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM photo_analysis WHERE {where}", params
+        ).fetchone()[0]
+        rows = conn.execute(
+            f"""
+            SELECT immich_asset_id, dish_name, cuisine, taken_at,
+                   venue_type, place_id, review_status
+              FROM photo_analysis
+             WHERE {where}
+          ORDER BY taken_at DESC NULLS LAST
+             LIMIT ? OFFSET ?
+            """,
+            [*params, _PAGE_SIZE, offset],
+        ).fetchall()
+        users = conn.execute(
+            "SELECT user_id, username, display_name FROM immich_users ORDER BY display_name"
+        ).fetchall()
 
     templates = request.app.state.templates
     return cast(
@@ -72,7 +68,9 @@ def feed(
                 "has_prev": page > 1,
                 "has_next": page * _PAGE_SIZE < total,
                 "venue_filter": venue_type or "",
+                "user_filter": user_id or "",
                 "valid_venue_types": list(VALID_VENUE_TYPES) + ["unknown"],
+                "users": [dict(u) for u in users],
             },
         ),
     )

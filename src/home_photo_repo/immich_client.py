@@ -85,7 +85,7 @@ class ImmichClient:
         and post-filter on the client to drop any item whose
         `(updated_at, id) <= (ts, last_id)`.
         """
-        body = {
+        body: dict[str, Any] = {
             "updatedAfter": updated_after.isoformat(),
             "withExif": True,
             "order": order,
@@ -99,6 +99,36 @@ class ImmichClient:
         parsed = [self._parse_asset(item) for item in items]
         # Drop items the cursor has already passed.
         return [a for a in parsed if (a.updated_at, a.id) > (updated_after, last_id)]
+
+    def search_all_assets(
+        self,
+        *,
+        page: int = 1,
+        size: int = 100,
+        order: str = "asc",
+    ) -> tuple[list[ImmichAsset], int | None]:
+        """Fetch a page of ALL assets with no date filter.
+
+        Returns (assets, next_page) where next_page is None on the last page.
+        Used for initial backfill when the updatedAfter cursor cannot reach
+        historical assets (e.g. all photos imported in one batch share the
+        same updatedAt, leaving the cursor stranded past them all).
+        """
+        body: dict[str, Any] = {
+            "withExif": True,
+            "order": order,
+            "size": size,
+            "page": page,
+        }
+        resp = self._post("/api/search/metadata", json=body)
+        try:
+            assets_resp = resp["assets"]
+            items = assets_resp["items"]
+            raw_next = assets_resp.get("nextPage")
+            next_page = int(raw_next) if raw_next is not None else None
+        except (KeyError, TypeError, ValueError) as e:
+            raise ImmichClientError(f"unexpected response shape: {e!r}") from e
+        return [self._parse_asset(item) for item in items], next_page
 
     def get_thumbnail(self, asset_id: str, *, size: str = "thumbnail") -> bytes:
         """Fetch an asset's thumbnail or preview.
@@ -116,6 +146,59 @@ class ImmichClient:
     def get_original(self, asset_id: str) -> bytes:
         """Fetch an asset's original full-resolution bytes."""
         return self._get_bytes(f"/api/assets/{asset_id}/original")
+
+    def get_asset_statistics(self) -> dict[str, int]:
+        """Return asset counts for the authenticated user.
+
+        Returns a dict with keys: ``images``, ``videos``, ``total``.
+        Calls GET /api/assets/statistics (user-scoped — each key sees only
+        its own assets).
+        """
+        url = f"{self._base_url}/api/assets/statistics"
+        try:
+            response = self._client.get(url, headers=self._headers)
+        except httpx.HTTPError as e:
+            raise ImmichClientError(
+                f"network error calling /api/assets/statistics: {e!r}"
+            ) from e
+        if response.status_code >= 400:
+            raise ImmichClientError(
+                f"Immich /api/assets/statistics returned {response.status_code}",
+                status_code=response.status_code,
+            )
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise ImmichClientError(
+                "non-JSON response from /api/assets/statistics"
+            ) from e
+        return {
+            "images": int(data.get("images", 0)),
+            "videos": int(data.get("videos", 0)),
+            "total": int(data.get("total", 0)),
+        }
+
+    def get_me(self) -> dict[str, str]:
+        """Return the authenticated user's id, name, and email."""
+        url = f"{self._base_url}/api/users/me"
+        try:
+            response = self._client.get(url, headers=self._headers)
+        except httpx.HTTPError as e:
+            raise ImmichClientError(f"network error calling /api/users/me: {e!r}") from e
+        if response.status_code >= 400:
+            raise ImmichClientError(
+                f"Immich /api/users/me returned {response.status_code}",
+                status_code=response.status_code,
+            )
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise ImmichClientError("non-JSON response from /api/users/me") from e
+        return {
+            "id": data["id"],
+            "name": data.get("name", ""),
+            "email": data.get("email", ""),
+        }
 
     def _get_bytes(
         self, path: str, *, params: dict[str, str] | None = None

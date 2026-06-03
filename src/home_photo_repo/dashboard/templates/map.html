@@ -1,8 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Map — home_photo_repo{% endblock %}
 {% block content %}
-<div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+<div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
   <h2 style="margin: 0;">Map ({{ count }} food photos with GPS)</h2>
+  {% if users|length > 1 %}
+  <form method="get" action="/" style="margin: 0;">
+    <select name="user_id" onchange="this.form.submit()">
+      <option value="" {% if not user_filter %}selected{% endif %}>All users</option>
+      {% for u in users %}
+        <option value="{{ u.user_id }}" {% if user_filter == u.user_id %}selected{% endif %}>
+          {{ u.display_name or u.username }}
+        </option>
+      {% endfor %}
+    </select>
+    {% if user_filter %}
+      <a href="/" style="font-size: 13px; color: var(--muted); margin-left: 6px;">✕ clear</a>
+    {% endif %}
+  </form>
+  {% endif %}
 </div>
 <div id="map"></div>
 <script>

@@ -22,10 +22,23 @@ def main() -> None:  # pragma: no cover - process entrypoint
         raise RuntimeError(
             f"DASHBOARD_BIND port must be an integer, got {port_str!r}"
         ) from e
+    # Build user_id → api_key map by calling Immich for each configured key.
+    # This runs once at dashboard startup and is held in memory (never stored).
+    from home_photo_repo.immich_client import ImmichClient, ImmichClientError
+    api_key_by_user_id: dict[str, str] = {}
+    for key in settings.all_api_keys_list:
+        try:
+            with ImmichClient(base_url=str(settings.immich_base_url), api_key=key) as c:
+                user_info = c.get_me()
+            api_key_by_user_id[user_info["id"]] = key
+        except ImmichClientError:
+            pass  # non-fatal; proxy falls back to primary key
+
     app = create_app(
         db_path=settings.db_path,
         immich_base_url=str(settings.immich_base_url),
         immich_api_key=settings.immich_api_key.get_secret_value(),
+        api_key_by_user_id=api_key_by_user_id,
     )
     uvicorn.run(app, host=host or "127.0.0.1", port=port, log_level="info")
 

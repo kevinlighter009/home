@@ -3,6 +3,10 @@
 Browsers can't authenticate to Immich's API (different origin, no api-key
 header support in <img> tags). This proxy is the single point that holds
 the Immich API key and streams bytes back to the page.
+
+For multi-user setups, the proxy looks up which Immich user owns the asset
+and uses their specific API key.  Falls back to the primary key for unknown
+owners.
 """
 
 from __future__ import annotations
@@ -27,9 +31,17 @@ def get_thumbnail(
     size: Literal["thumbnail", "preview"] = "thumbnail",
 ) -> Response:
     deps = request.app.state.deps
-    client = ImmichClient(
-        base_url=deps.immich_base_url, api_key=deps.immich_api_key,
-    )
+
+    # Resolve the correct API key for this asset's owner.
+    with deps.db_conn() as conn:
+        row = conn.execute(
+            "SELECT uploader_user_id FROM photo_analysis WHERE immich_asset_id = ?",
+            (asset_id,),
+        ).fetchone()
+    owner_id = row["uploader_user_id"] if row else None
+    api_key = deps.api_key_for_user(owner_id)
+
+    client = ImmichClient(base_url=deps.immich_base_url, api_key=api_key)
     try:
         try:
             data = client.get_thumbnail(asset_id, size=size)

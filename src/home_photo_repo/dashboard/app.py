@@ -20,12 +20,14 @@ def create_app(
     db_path: Path,
     immich_base_url: str,
     immich_api_key: str,
+    api_key_by_user_id: dict[str, str] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="home_photo_repo", docs_url=None, redoc_url=None)
     app.state.deps = DashboardDeps(
         db_path=db_path,
         immich_base_url=immich_base_url,
         immich_api_key=immich_api_key,
+        api_key_by_user_id=api_key_by_user_id,
     )
     app.state.templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
@@ -46,8 +48,6 @@ def create_app(
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
-
-    # Routes are registered in subsequent tasks via app.include_router(...)
 
     return app
 
