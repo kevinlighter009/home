@@ -341,6 +341,14 @@ def _record_venue_match(
     # asset, the user can correct it manually via the review form.
     # If the match itself is ambiguous, escalate review_status; but don't
     # downgrade an already-confirmed/auto status without reason.
+
+    # venue_retry_after: set to 1st of next month when Google found nothing
+    # or budget was exhausted; NULL otherwise (success or local match).
+    retry_after: str | None = None
+    if match.retry_next_month:
+        from home_photo_repo.worker.google_budget import GoogleBudget  # local import avoids circularity
+        retry_after = GoogleBudget().next_month_start().isoformat()
+
     if match.needs_review:
         conn.execute(
             """
@@ -350,6 +358,7 @@ def _record_venue_match(
                    place_match_source     = ?,
                    place_match_distance_m = ?,
                    venue_resolved_at      = ?,
+                   venue_retry_after      = ?,
                    review_status          = 'needs_review',
                    review_notes           = ?
              WHERE immich_asset_id = ?
@@ -360,6 +369,7 @@ def _record_venue_match(
                 match.source,
                 match.distance_m,
                 now.isoformat(),
+                retry_after,
                 match.notes,
                 asset_id,
             ),
@@ -373,6 +383,7 @@ def _record_venue_match(
                    place_match_source     = ?,
                    place_match_distance_m = ?,
                    venue_resolved_at      = ?,
+                   venue_retry_after      = ?,
                    review_notes           = ?
              WHERE immich_asset_id = ?
             """,
@@ -382,6 +393,7 @@ def _record_venue_match(
                 match.source,
                 match.distance_m,
                 now.isoformat(),
+                retry_after,
                 match.notes,
                 asset_id,
             ),

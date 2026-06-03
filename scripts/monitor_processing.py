@@ -162,6 +162,22 @@ def _render(
         ))
 
     print("─" * w)
+
+    # Google Places budget bar
+    google_key = settings.google_places_api_key.get_secret_value()
+    if google_key and google_key not in ("replace_me", ""):
+        try:
+            from home_photo_repo.worker.google_budget import GoogleBudget
+            budget = GoogleBudget(limit=settings.google_places_monthly_budget)
+            used = budget.used_this_month(conn)
+            limit = budget.limit()
+            remaining = budget.remaining(conn)
+            bar_filled = int(used / limit * 30) if limit else 0
+            bar = "█" * bar_filled + "░" * (30 - bar_filled)
+            print(f"  Google Places [{bar}] {used}/{limit} this month  ({remaining} remaining)")
+        except Exception:
+            pass
+
     print(f"  Refreshing every {REFRESH_SECONDS}s  —  Ctrl-C to quit")
     return new_counts
 

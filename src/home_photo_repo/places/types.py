@@ -46,6 +46,11 @@ class MatchResult:
     # the ambiguity threshold. The pipeline can pass these to the venue
     # disambiguator for an LLM tiebreaker.
     ambiguous_candidates: tuple[NearbyPlace, ...] = ()
+    # True when venue resolution should be retried next month: either the
+    # monthly Google Places budget was exhausted, or Google returned no
+    # candidates (new venues may appear later).  The pipeline writes
+    # venue_retry_after = 1st of next month when this is set.
+    retry_next_month: bool = False
 
 
 VALID_VENUE_TYPES: tuple[str, ...] = (

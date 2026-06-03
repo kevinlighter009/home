@@ -50,7 +50,12 @@ from home_photo_repo.worker.cursor import (
     write_backfill_page,
     write_cursor,
 )
+from home_photo_repo.worker.google_budget import GoogleBudget
 from home_photo_repo.worker.pipeline import ProcessResult, process_asset
+from home_photo_repo.worker.venue_backfill import (
+    has_pending as venue_has_pending,
+    run_venue_backfill_batch,
+)
 
 log = logging.getLogger(__name__)
 
@@ -372,11 +377,13 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
         if google_key and google_key != "replace_me"
         else None
     )
+    google_budget = GoogleBudget(limit=settings.google_places_monthly_budget)
     place_matcher = PlaceMatcher(
         repo=PlacesRepository(conn),
         google=google_client,
         ambiguous_threshold_m=settings.place_match_ambiguous_threshold_m,
         search_radius_m=settings.google_places_search_radius_m,
+        budget=google_budget,
     )
 
     def _disambiguator_fn(
@@ -421,6 +428,8 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
         "enabled" if google_client else "disabled (curated places only)",
         _RECONCILE_EVERY,
     )
+    if google_client:
+        log.info("google_places budget: %s", google_budget.report(conn))
 
     _pipeline_kwargs: dict = dict(
         batch_size=settings.backfill_batch_size,
@@ -460,7 +469,32 @@ def run_forever(settings: Settings) -> None:  # pragma: no cover - integration e
                     # Tiny yield when page was entirely already-processed (avoids spin).
                     if summary.assets_processed == 0 and summary.errors == 0:
                         time.sleep(0.1)
+                elif venue_has_pending(conn, user_id):
+                    # Phase 2: venue backfill — re-resolve 'unknown' food photos
+                    # now that Google Places is configured.  Runs between the
+                    # photo backfill and steady-state incremental polling.
+                    any_backfilling = True
+                    vsummary = run_venue_backfill_batch(
+                        conn, place_matcher, google_budget,
+                        user_id=user_id,
+                    )
+                    log.info(
+                        "[%s] venue backfill: resolved=%d cache_hits=%d "
+                        "google_calls=%d miss=%d budget_skipped=%d errors=%d "
+                        "budget=%s%s",
+                        username,
+                        vsummary.resolved,
+                        vsummary.cache_hits,
+                        vsummary.google_calls,
+                        vsummary.google_miss,
+                        vsummary.budget_skipped,
+                        vsummary.errors,
+                        google_budget.report(conn),
+                        "" if vsummary.still_pending else " → venue backfill complete",
+                    )
+
                 else:
+                    # Phase 3: incremental polling for new photos.
                     summary = run_once(
                         conn, client, user_id=user_id, **_pipeline_kwargs
                     )

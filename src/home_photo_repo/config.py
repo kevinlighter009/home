@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     place_match_ambiguous_threshold_m: int = 50
     curated_place_default_radius_m: int = 50
     google_places_search_radius_m: int = 150
+    google_places_monthly_budget: int = 1000  # API calls per calendar month
     anthropic_rate_limit_per_minute: int = 30
     dashboard_bind: str = "127.0.0.1:8000"
 

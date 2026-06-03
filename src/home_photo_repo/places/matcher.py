@@ -19,6 +19,12 @@ from home_photo_repo.places.haversine import haversine_m
 from home_photo_repo.places.repository import PlacesRepository
 from home_photo_repo.places.types import VALID_VENUE_TYPES, CuratedPlace, MatchResult, NearbyPlace
 
+# Imported lazily to avoid a circular import (worker → places → worker).
+# GoogleBudget is only used at runtime when explicitly passed in.
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from home_photo_repo.worker.google_budget import GoogleBudget
+
 
 class _GoogleLike(Protocol):
     def search_nearby(
@@ -63,13 +69,20 @@ class PlaceMatcher:
         google: _GoogleLike | None,
         ambiguous_threshold_m: int,
         search_radius_m: int,
+        budget: "GoogleBudget | None" = None,
     ) -> None:
         self._repo = repo
         self._google = google
         self._ambiguous_threshold_m = ambiguous_threshold_m
         self._search_radius_m = search_radius_m
+        self._budget = budget
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def match(self, *, latitude: float, longitude: float) -> MatchResult:
+        """Full resolution: local cache → Google Places (budget-gated) → unknown."""
         local = self._repo.nearby(latitude, longitude)
         if local:
             return self._resolve_local(local)
@@ -80,6 +93,18 @@ class PlaceMatcher:
                 source="unknown", needs_review=True,
                 notes="no google_places client configured",
             )
+
+        # Budget gate: check before calling the Google API.
+        if self._budget is not None:
+            conn = self._repo._conn
+            if not self._budget.check_and_consume(conn):
+                return MatchResult(
+                    place_id=None, venue_type="unknown", distance_m=None,
+                    source="unknown", needs_review=True,
+                    retry_next_month=True,
+                    notes="google_places monthly budget exhausted",
+                )
+
         try:
             candidates = self._google.search_nearby(
                 latitude=latitude, longitude=longitude,
@@ -95,9 +120,58 @@ class PlaceMatcher:
             return MatchResult(
                 place_id=None, venue_type="unknown", distance_m=None,
                 source="unknown", needs_review=True,
+                retry_next_month=True,
                 notes="no google places candidates",
             )
 
+        return self._rank_and_cache(candidates, latitude, longitude)
+
+    def local_lookup(
+        self, latitude: float, longitude: float
+    ) -> MatchResult | None:
+        """Check only the local cache (curated + previously-cached Google rows).
+
+        Returns a resolved ``MatchResult`` on a hit, or ``None`` on a miss.
+        Never calls the Google Places API.  Used by the venue backfill to
+        pre-filter photos before issuing concurrent Google requests.
+        """
+        local = self._repo.nearby(latitude, longitude)
+        return self._resolve_local(local) if local else None
+
+    def match_from_candidates(
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        candidates: list[NearbyPlace],
+    ) -> MatchResult:
+        """Resolve a venue given pre-fetched Google candidates.
+
+        The venue backfill fetches candidates concurrently (pure HTTP, no DB)
+        then calls this to do the ranking, caching, and ambiguity check on the
+        main thread.  Separating the HTTP step from the DB step makes it safe
+        to parallelise API calls while keeping SQLite writes single-threaded.
+        """
+        if not candidates:
+            return MatchResult(
+                place_id=None, venue_type="unknown", distance_m=None,
+                source="unknown", needs_review=True,
+                retry_next_month=True,
+                notes="no google places candidates",
+            )
+        return self._rank_and_cache(candidates, latitude, longitude)
+
+    @property
+    def search_radius_m(self) -> int:
+        return self._search_radius_m
+
+    def _rank_and_cache(
+        self,
+        candidates: list[NearbyPlace],
+        latitude: float,
+        longitude: float,
+    ) -> MatchResult:
+        """Rank candidates by distance, cache the winner, return a MatchResult."""
         ranked = sorted(
             candidates,
             key=lambda c: haversine_m(latitude, longitude, c.latitude, c.longitude),
@@ -112,20 +186,14 @@ class PlaceMatcher:
             type=venue_bucket,
             latitude=chosen.latitude,
             longitude=chosen.longitude,
-            # Use the tight ambiguity threshold as the cache row's radius —
-            # only a very close future photo should re-match this row, otherwise
-            # we'd cluster distinct restaurants on the same block.
             radius_m=self._ambiguous_threshold_m,
             google_place_id=chosen.google_place_id,
             address=chosen.address,
-            # Preserve raw Google types for debugging / future re-mapping.
             notes=",".join(chosen.types) if chosen.types else None,
         )
         try:
             self._repo.insert(cached)
         except Exception:  # noqa: BLE001
-            # Cache write failure must not fail the match (likely a unique
-            # constraint race between two concurrent matchers). Log and move on.
             logging.getLogger(__name__).warning(
                 "failed to cache gplaces row id=%s name=%s",
                 cached.id, cached.name, exc_info=True,
