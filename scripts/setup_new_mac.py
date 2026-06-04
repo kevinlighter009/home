@@ -360,6 +360,11 @@ def main() -> int:
 
     if args.dry_run:
         print("  [DRY RUN — no changes will be made]")
+    else:
+        # Cache sudo credentials once upfront so nginx (brew services) and
+        # Bonjour (scutil) steps don't each prompt for a password separately.
+        print("  Some steps need sudo (nginx on port 80, hostname). Enter your password once:")
+        subprocess.run(["sudo", "-v"], check=False)
 
     # Step 1: Homebrew is a hard prerequisite
     if not ensure_homebrew():

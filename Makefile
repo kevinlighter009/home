@@ -99,7 +99,11 @@ bootstrap-existing:
 	uv venv
 	uv sync --all-extras
 	@if [ ! -f .env ]; then \
-		echo "ERROR: .env missing. Create it from .env.example first."; \
+		cp .env.example .env; \
+		chmod 600 .env; \
+		echo ""; \
+		echo "ERROR: Created .env from template. Fill in your secrets (IMMICH_API_KEYS,"; \
+		echo "       ANTHROPIC_API_KEY, etc.) then re-run 'make bootstrap-existing'."; \
 		exit 1; \
 	fi
 	@chmod 600 .env
