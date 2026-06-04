@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -36,6 +38,36 @@ log = logging.getLogger(__name__)
 
 _BATCH_SIZE = 50   # photos per backfill cycle
 _MAX_WORKERS = 5   # concurrent Google HTTP calls
+
+# Google Places API hard limit is 600 requests/minute.
+# We target 10% below that for safety headroom.
+_GOOGLE_RATE_LIMIT_PER_MINUTE = 540
+
+
+class _RateLimiter:
+    """Simple interval-based rate limiter (leaky-bucket style).
+
+    Shared across all threads via a lock so concurrent workers don't
+    collectively exceed the per-minute quota.
+    """
+
+    def __init__(self, calls_per_minute: int) -> None:
+        self._interval = 60.0 / calls_per_minute   # min seconds between calls
+        self._lock = threading.Lock()
+        self._last_call: float = 0.0
+
+    def acquire(self) -> None:
+        """Block the calling thread until it is safe to fire an API call."""
+        with self._lock:
+            now = time.monotonic()
+            wait = self._interval - (now - self._last_call)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_call = time.monotonic()
+
+
+# Module-level singleton — shared across all ThreadPoolExecutor workers.
+_google_rate_limiter = _RateLimiter(_GOOGLE_RATE_LIMIT_PER_MINUTE)
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +187,14 @@ def _google_fetch(
     lng: float,
     radius_m: int,
 ) -> list[NearbyPlace]:
-    """Pure HTTP call — no DB access.  Safe to run in a thread pool."""
+    """Rate-limited Google Places HTTP call — safe to run in a thread pool.
+
+    Acquires a token from the shared rate limiter before every request so
+    the combined throughput of all concurrent workers never exceeds
+    _GOOGLE_RATE_LIMIT_PER_MINUTE (currently 540 req/min, safely below
+    Google's hard cap of 600 req/min).
+    """
+    _google_rate_limiter.acquire()
     return google_client.search_nearby(latitude=lat, longitude=lng, radius_m=radius_m)
 
 
