@@ -289,45 +289,83 @@ expose it on the LAN, add HTTP Basic auth first (out of scope here).
 make smoke-dashboard      # hits /healthz, prints OK
 ```
 
-## Restarting the stack
+## Running on a new Mac (first-time setup)
 
-All code, data, and model weights live on the SSD at `/Volumes/PhotoSSD/`.
-Plug in the SSD, open four terminals, and run:
+Everything — code, database, and MLX model weights — lives on the external SSD at
+`/Volumes/PhotoSSD/`. Plug it in, then run the commands below **once** on the new machine.
+
+### Prerequisites (install manually if missing)
 
 ```bash
-# 0 — always start here
+# 1. Homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2. uv (Python package manager)
+brew install uv
+
+# 3. Docker Desktop — download from https://www.docker.com/products/docker-desktop/
+#    Open it at least once so the Docker daemon starts.
+
+# 4. git (usually pre-installed; confirm with `git --version`)
+```
+
+### One-time machine setup
+
+```bash
+# 5. Enter the repo (everything lives on the SSD)
 cd /Volumes/PhotoSSD/repo
+
+# 6. Install Python deps, apply DB migrations, configure Tailscale IP
+make bootstrap-existing
+
+# 7. Set a memorable local hostname (makes http://home-food.local work on home WiFi)
+sudo scutil --set LocalHostName home-food
+sudo scutil --set ComputerName  home-food
+
+# 8. Install + start nginx reverse proxy on port 80
+make install-nginx
+sudo brew services start nginx
+
+# 9. Connect to Tailscale (for remote access when away from home)
+#    — skip if you don't need remote access
+tailscale login          # opens browser; log in with your Tailscale account
+make configure-tailscale # prints your LAN and Tailscale URLs
 ```
 
-```bash
-# Terminal 1 — Immich (Docker)
-cd docker/immich && docker compose up -d && cd ../..
-```
+### Every time you restart
+
+Open **four terminals**, all from `/Volumes/PhotoSSD/repo`:
 
 ```bash
-# Terminal 2 — MLX vision model server (HF_HOME set automatically by Makefile)
+# Terminal 1 — Immich (photo library backend)
+cd docker/immich && docker compose up -d
+
+# Terminal 2 — MLX vision model server (runs on Apple Silicon)
 make start-mlx
-```
 
-```bash
-# Terminal 3 — Worker (ingests + classifies photos)
+# Terminal 3 — Worker (classifies photos + resolves venues)
 make dev-worker
-```
 
-```bash
-# Terminal 4 — Dashboard  http://127.0.0.1:8000
+# Terminal 4 — Dashboard
 make dev-dashboard
 ```
 
+**Access the dashboard:**
+
+| Network | URL |
+|---------|-----|
+| Home WiFi (no Tailscale needed) | http://home-food.local |
+| Away from home (Tailscale required) | http://\<device\>.tail-xyz.ts.net |
+
 ```bash
-# Optional — live processing progress
+# Optional — live processing progress monitor
 make monitor
 ```
 
-To shut everything down:
+### Shut everything down
 
 ```bash
-# Worker / dashboard / MLX server: Ctrl-C in their respective terminals
+# Worker / dashboard / MLX: Ctrl-C in their terminals
 
 # Immich:
 cd /Volumes/PhotoSSD/repo/docker/immich && docker compose down
