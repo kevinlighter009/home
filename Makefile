@@ -1,4 +1,4 @@
-.PHONY: bootstrap bootstrap-existing ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor start-mlx digest digest-dry configure-tailscale install-nginx uninstall-nginx
+.PHONY: bootstrap bootstrap-existing setup-new-mac ensure-db dev-worker dev-dashboard test lint typecheck format smoke-immich smoke-llm smoke-places smoke-dashboard install-launchd uninstall-launchd logs backup-now install-mlx smoke-mlx monitor start-mlx digest digest-dry configure-tailscale install-nginx uninstall-nginx
 
 PYTHON := uv run python
 PYTEST := uv run pytest
@@ -81,7 +81,13 @@ logs:
 backup-now:
 	scripts/backup_postgres.sh
 
+setup-new-mac:
+	python3 scripts/setup_new_mac.py
+
 bootstrap-existing:
+	@echo "--- Installing system dependencies (Homebrew, uv, Docker, nginx, Tailscale) ---"
+	python3 scripts/setup_new_mac.py || true
+	@echo ""
 	uv venv
 	uv sync --all-extras
 	@if [ ! -f .env ]; then \

@@ -292,44 +292,46 @@ make smoke-dashboard      # hits /healthz, prints OK
 ## Running on a new Mac (first-time setup)
 
 Everything — code, database, and MLX model weights — lives on the external SSD at
-`/Volumes/PhotoSSD/`. Plug it in, then run the commands below **once** on the new machine.
+`/Volumes/PhotoSSD/`. Plug it in, then run **two commands** on the new machine.
 
-### Prerequisites (install manually if missing)
+### Step 1 — Install Homebrew (only prerequisite)
+
+Homebrew is the only thing that can't be auto-installed. Check first:
 
 ```bash
-# 1. Homebrew
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# 2. uv (Python package manager)
-brew install uv
-
-# 3. Docker Desktop — download from https://www.docker.com/products/docker-desktop/
-#    Open it at least once so the Docker daemon starts.
-
-# 4. git (usually pre-installed; confirm with `git --version`)
+brew --version   # if this works, skip the install below
 ```
 
-### One-time machine setup
+If missing:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+### Step 2 — Run bootstrap (installs everything else automatically)
 
 ```bash
-# 5. Enter the repo (everything lives on the SSD)
 cd /Volumes/PhotoSSD/repo
-
-# 6. Install Python deps, apply DB migrations, configure Tailscale IP
 make bootstrap-existing
+```
 
-# 7. Set a memorable local hostname (makes http://home-food.local work on home WiFi)
-sudo scutil --set LocalHostName home-food
-sudo scutil --set ComputerName  home-food
+This single command automatically:
+1. **uv** — Python package manager (`brew install uv`)
+2. **Docker Desktop** — installs via brew cask + waits for daemon to start
+3. **nginx** — installs, configures reverse proxy, starts on port 80 (sudo required)
+4. **Bonjour hostname** — sets `home-food.local` via `sudo scutil` (sudo required)
+5. **Tailscale** — installs + checks connection; prompts `tailscale login` if needed
+6. **Python deps** — `uv venv && uv sync --all-extras`
+7. **DB migrations** — applies any pending schema changes
 
-# 8. Install + start nginx reverse proxy on port 80
-make install-nginx
-sudo brew services start nginx
+> **Note on sudo steps:** nginx and the Bonjour hostname require `sudo`. If running
+> non-interactively the script prints the manual commands to run once in a terminal.
 
-# 9. Connect to Tailscale (for remote access when away from home)
-#    — skip if you don't need remote access
+### Step 3 — Connect Tailscale (remote access only)
+
+If Tailscale wasn't already logged in, run:
+```bash
 tailscale login          # opens browser; log in with your Tailscale account
-make configure-tailscale # prints your LAN and Tailscale URLs
+make configure-tailscale # updates .env and prints your access URLs
 ```
 
 ### Every time you restart
