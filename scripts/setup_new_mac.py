@@ -101,6 +101,8 @@ def ensure_uv(dry_run: bool) -> None:
 # ── Step 3 — Docker Desktop ──────────────────────────────────────────────────
 
 def _docker_running() -> bool:
+    if not shutil.which("docker"):
+        return False
     result = subprocess.run(["docker", "info"], capture_output=True, check=False)
     return result.returncode == 0
 

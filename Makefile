@@ -7,6 +7,14 @@ PYTEST := uv run pytest
 # All make targets (worker, dashboard, smoke tests) inherit this.
 export HF_HOME := /Volumes/PhotoSSD/mlx_models
 
+# Resolve SSD_DATA_DIR: shell env > .env file > ~/home_photo_repo_data fallback.
+# This ensures bootstrap-existing finds the right path on a fresh Mac without
+# the user needing to manually export SSD_DATA_DIR before running make.
+ifndef SSD_DATA_DIR
+SSD_DATA_DIR := $(or $(shell grep -E '^SSD_DATA_DIR=' .env 2>/dev/null | head -1 | cut -d= -f2-),$(HOME)/home_photo_repo_data)
+endif
+export SSD_DATA_DIR
+
 bootstrap:
 	@if [ -f .env ]; then \
 		if grep -qE '^(IMMICH_API_KEY|ANTHROPIC_API_KEY)=replace_me' .env; then \
