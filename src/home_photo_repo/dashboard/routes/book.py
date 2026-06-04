@@ -32,13 +32,28 @@ _FOOD_WHERE = """
 """
 
 
+def _sqlite_week_to_monday(week_str: str) -> date:
+    """Convert SQLite '%Y-%W' (Sunday-based, 00-53) to the Monday of that week.
+
+    SQLite's %W counts weeks starting from the first Monday of the year.
+    Week 00 contains days before the first Monday; we treat those as Jan 1's week.
+    We parse via strptime with %W and a fixed weekday anchor (%w=1 = Monday).
+    """
+    try:
+        year, week = int(week_str[:4]), int(week_str[5:])
+        if week == 0:
+            # Days before the first Monday — just return Jan 1 of that year
+            return date(year, 1, 1)
+        # strptime: %Y-%W-%w where %w=1 is Monday
+        return datetime.strptime(f"{year}-{week:02d}-1", "%Y-%W-%w").date()
+    except Exception:  # noqa: BLE001
+        return date.today()
+
+
 def _week_label(week_str: str) -> str:
     """Convert SQLite '%Y-%W' string to a human-readable range like 'Jun 2–8, 2026'."""
     try:
-        # Parse year and ISO week number
-        year, week = int(week_str[:4]), int(week_str[5:])
-        # Monday of that week
-        monday = datetime.fromisocalendar(year, max(week, 1), 1).date()
+        monday = _sqlite_week_to_monday(week_str)
         sunday = monday + timedelta(days=6)
         if monday.month == sunday.month:
             return f"{monday.strftime('%b %-d')}–{sunday.day}, {monday.year}"
@@ -52,10 +67,9 @@ def _compute_streaks(shared_weeks: list[str]) -> dict:
     if not shared_weeks:
         return {"current": 0, "longest": 0}
 
-    # Convert to ISO dates (Monday of each week)
+    # Convert to Monday dates using the same parser as _week_label
     def _monday(w: str) -> date:
-        year, week = int(w[:4]), int(w[5:])
-        return datetime.fromisocalendar(year, max(week, 1), 1).date()
+        return _sqlite_week_to_monday(w)
 
     dated = sorted({_monday(w) for w in shared_weeks}, reverse=True)
 
